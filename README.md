@@ -1,49 +1,37 @@
 # flutter_open_xr
 
+[![pub package](https://img.shields.io/pub/v/flutter_open_xr.svg)](https://pub.dev/packages/flutter_open_xr)
+
 `flutter_open_xr` は、任意の Flutter プロジェクトを Windows 向け OpenXR ホストで実行するための CLI パッケージです。
-このリポジトリのルートがそのまま Dart パッケージになっています。
 
-`dev_dependencies` に追加して、対象プロジェクト側で次を実行します。
-
-```powershell
-dart run flutter_open_xr build
-```
-
-このコマンドは次を自動実行します。
+`dart run flutter_open_xr build` を実行すると、次を自動実行します。
 
 1. `flutter pub get`
 2. `flutter build bundle --debug --target-platform=windows-x64`
 3. Flutter `engineRevision` に一致する `windows-x64-embedder.zip` を取得
-4. OpenXR-SDK (`release-1.1.57`) を取得（未指定時）
+4. OpenXR-SDK (`release-1.1.57`) を取得（`--openxr-sdk-dir` 未指定時）
 5. 同梱ネイティブホスト (`native/windows`) を CMake + MSBuild でビルド
 
-## インストール例
+## インストール（pub.dev）
 
-```yaml
-dev_dependencies:
-  flutter_open_xr:
-    git:
-      url: https://example.invalid/your-repo.git
-```
+パッケージページ: https://pub.dev/packages/flutter_open_xr
 
-## ローカルサンプル
-
-このリポジトリには `example/` に最小カウンターサンプルがあります。  
-`example/pubspec.yaml` では次のように親ディレクトリを `path` 参照しています。
-
-```yaml
-dev_dependencies:
-  flutter_open_xr:
-    path: ..
-```
+Flutter プロジェクトで:
 
 ```powershell
-cd example
-flutter pub get
-dart run flutter_open_xr build --dry-run
+flutter pub add --dev flutter_open_xr
+```
+
+または `pubspec.yaml` に直接記載:
+
+```yaml
+dev_dependencies:
+  flutter_open_xr: ^0.1.1
 ```
 
 ## 使い方
+
+対象 Flutter プロジェクトのルートで実行:
 
 ```powershell
 dart run flutter_open_xr build
@@ -60,6 +48,12 @@ dart run flutter_open_xr build
 --git <path>              git 実行ファイル
 --configuration <name>    Debug / Release / RelWithDebInfo / MinSizeRel
 --dry-run                 実行せずコマンドのみ表示
+```
+
+ヘルプ表示:
+
+```powershell
+dart run flutter_open_xr build --help
 ```
 
 ## 出力先
@@ -84,7 +78,19 @@ flutter_open_xr_runner.exe
 - Flutter SDK
 - OpenXR Runtime (Quest Link / SteamVR など)
 
-## 旧構成のメモ
+## ローカルサンプル
 
-以前のネイティブ検証プロジェクトは `legacy/native_sample/` に移動し、
-関連メモは `docs/legacy_native_sample/` に移動しています。
+このリポジトリには `example/` に最小カウンターサンプルがあります。  
+`example/pubspec.yaml` では親ディレクトリを `path` 参照しています。
+
+```yaml
+dev_dependencies:
+  flutter_open_xr:
+    path: ..
+```
+
+```powershell
+cd example
+flutter pub get
+dart run flutter_open_xr build --dry-run
+```
