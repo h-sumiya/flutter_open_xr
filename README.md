@@ -1,93 +1,115 @@
 # flutter_open_xr
 
+[English](README.md) | [日本語](README.ja.md)
+
 [![pub package](https://img.shields.io/pub/v/flutter_open_xr.svg)](https://pub.dev/packages/flutter_open_xr)
 
-`flutter_open_xr` は、任意の Flutter プロジェクトを Windows 向け OpenXR ホストで実行するための CLI パッケージです。
+![flutter_open_xr counter sample](screenshot/counter.png)
 
-`dart run flutter_open_xr build` を実行すると、次を自動実行します。
+Build Flutter UI into a Windows OpenXR runtime host with one command.
+
+> [!WARNING]
+> This project is in active development and still experimental.
+> APIs, output structure, and build behavior may change between releases.
+
+## Why this project
+
+`flutter_open_xr` is a CLI package for teams that want to:
+
+- Keep Flutter as the app UI layer.
+- Run inside a native Windows OpenXR host.
+- Reproduce builds from a predictable, scripted pipeline.
+
+## What the build command does
+
+`dart run flutter_open_xr build` runs these steps:
 
 1. `flutter pub get`
 2. `flutter build bundle --debug --target-platform=windows-x64`
-3. Flutter `engineRevision` に一致する `windows-x64-embedder.zip` を取得
-4. OpenXR-SDK (`release-1.1.57`) を取得（`--openxr-sdk-dir` 未指定時）
-5. 同梱ネイティブホスト (`native/windows`) を CMake + MSBuild でビルド
+3. Download the Flutter embedder ZIP pinned to your local Flutter `engineRevision`
+4. Use OpenXR-SDK `release-1.1.57` (or your own checkout via `--openxr-sdk-dir`)
+5. Build `native/windows` via CMake + MSBuild and copy runtime files to output
 
-## インストール（pub.dev）
-
-パッケージページ: https://pub.dev/packages/flutter_open_xr
-
-Flutter プロジェクトで:
+## Install
 
 ```powershell
 flutter pub add --dev flutter_open_xr
 ```
 
-または `pubspec.yaml` に直接記載:
+Or in `pubspec.yaml`:
 
 ```yaml
 dev_dependencies:
   flutter_open_xr: ^0.1.1
 ```
 
-## 使い方
+## Quick start
 
-対象 Flutter プロジェクトのルートで実行:
+From your Flutter project root:
 
 ```powershell
 dart run flutter_open_xr build
 ```
 
-主要オプション:
-
-```text
---project-dir <path>      対象 Flutter プロジェクトディレクトリ
---output-dir <path>       最終出力先ディレクトリ
---openxr-sdk-dir <path>   既存の OpenXR-SDK を使う
---cmake <path>            cmake 実行ファイル
---flutter <path>          flutter 実行ファイル
---git <path>              git 実行ファイル
---configuration <name>    Debug / Release / RelWithDebInfo / MinSizeRel
---dry-run                 実行せずコマンドのみ表示
-```
-
-ヘルプ表示:
+Show all options:
 
 ```powershell
 dart run flutter_open_xr build --help
 ```
 
-## 出力先
+Dry-run to verify commands without executing:
 
-デフォルト出力:
+```powershell
+dart run flutter_open_xr build --dry-run
+```
+
+## Build options
+
+```text
+--project-dir <path>      Flutter project directory (default: current directory)
+--output-dir <path>       Output directory for runtime artifacts
+--openxr-sdk-dir <path>   Existing OpenXR-SDK directory to use (skip clone)
+--cmake <path>            CMake executable path (default: cmake)
+--flutter <path>          Flutter executable path (default: flutter)
+--git <path>              Git executable path (default: git)
+--configuration <name>    Debug / Release / RelWithDebInfo / MinSizeRel (default: Release)
+--dry-run                 Print commands only
+```
+
+## Requirements
+
+- Windows 10/11
+- Visual Studio 2022 Build Tools (C++ toolchain)
+- CMake
+- Flutter SDK
+- OpenXR Runtime (for example Quest Link or SteamVR)
+
+## Output
+
+Default output directory:
 
 ```text
 <project>/build/flutter_open_xr/windows/Release
 ```
 
-実行ファイル:
+Main executable:
 
 ```text
 flutter_open_xr_runner.exe
 ```
 
-## 前提
+## Local example
 
-- Windows 10/11
-- Visual Studio 2022 Build Tools (C++)
-- CMake
-- Flutter SDK
-- OpenXR Runtime (Quest Link / SteamVR など)
-
-## ローカルサンプル
-
-このリポジトリには `example/` に最小カウンターサンプルがあります。  
-`example/pubspec.yaml` では親ディレクトリを `path` 参照しています。
+This repository includes a sample app in `example/`.
+It uses a local path dependency:
 
 ```yaml
 dev_dependencies:
   flutter_open_xr:
     path: ..
 ```
+
+Run:
 
 ```powershell
 cd example
