@@ -1,0 +1,13 @@
+name: offscreen_ui
+description: Flutter UI sample used by flutter_xr step2 offscreen embedder.
+publish_to: "none"
+
+environment:
+  sdk: ">=3.3.0 <4.0.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+flutter:
+  uses-material-design: true
