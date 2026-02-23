@@ -155,30 +155,30 @@ target_link_libraries(
 
 add_dependencies(flutter_xr_runtime flutter_embedder_runtime flutter_assets_runtime)
 
-add_executable(flutter_xr_step4 flutter_xr/main.cpp)
-target_link_libraries(flutter_xr_step4 PRIVATE flutter_xr_runtime)
-add_dependencies(flutter_xr_step4 flutter_embedder_runtime flutter_assets_runtime)
-configure_app_target(flutter_xr_step4)
+add_executable(flutter_xr flutter_xr/main.cpp)
+target_link_libraries(flutter_xr PRIVATE flutter_xr_runtime)
+add_dependencies(flutter_xr flutter_embedder_runtime flutter_assets_runtime)
+configure_app_target(flutter_xr)
 
 add_custom_command(
-  TARGET flutter_xr_step4
+  TARGET flutter_xr
   POST_BUILD
   COMMAND ${CMAKE_COMMAND} -E copy_if_different "${FLUTTER_ENGINE_DLL}"
-          "$<TARGET_FILE_DIR:flutter_xr_step4>/flutter_engine.dll"
-  COMMAND ${CMAKE_COMMAND} -E make_directory "$<TARGET_FILE_DIR:flutter_xr_step4>/data"
+          "$<TARGET_FILE_DIR:flutter_xr>/flutter_engine.dll"
+  COMMAND ${CMAKE_COMMAND} -E make_directory "$<TARGET_FILE_DIR:flutter_xr>/data"
   COMMAND ${CMAKE_COMMAND} -E copy_directory "${FLUTTER_ASSET_DIR}"
-          "$<TARGET_FILE_DIR:flutter_xr_step4>/data/flutter_assets"
-  COMMENT "Copying Flutter runtime files next to flutter_xr_step4"
+          "$<TARGET_FILE_DIR:flutter_xr>/data/flutter_assets"
+  COMMENT "Copying Flutter runtime files next to flutter_xr"
 )
 
 if(EXISTS "${FLUTTER_ICUDTL_SOURCE}")
   add_custom_command(
-    TARGET flutter_xr_step4
+    TARGET flutter_xr
     POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_if_different "${FLUTTER_ICUDTL_SOURCE}"
-            "$<TARGET_FILE_DIR:flutter_xr_step4>/icudtl.dat"
+            "$<TARGET_FILE_DIR:flutter_xr>/icudtl.dat"
     COMMENT "Copying icudtl.dat from local Flutter SDK cache"
   )
 else()
-  message(WARNING "icudtl.dat was not found at ${FLUTTER_ICUDTL_SOURCE}. flutter_xr_step4 may fail at runtime.")
+  message(WARNING "icudtl.dat was not found at ${FLUTTER_ICUDTL_SOURCE}. flutter_xr may fail at runtime.")
 endif()

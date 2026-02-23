@@ -2,7 +2,7 @@
 
 Windows 上で OpenXR 空間に Flutter UI を表示し、コントローラー入力を Flutter のポインタイベントへ変換するサンプルです。
 
-現在の実装は `flutter_xr_step4` のみを正式ターゲットとして扱います。
+現在の実装は `flutter_xr` ターゲットを正式ターゲットとして扱います。
 
 ## 前提
 
@@ -39,14 +39,14 @@ git clone https://github.com/KhronosGroup/OpenXR-SDK.git reference/OpenXR-SDK
 
 ```powershell
 & 'C:\Program Files\Microsoft Visual Studio\2022\Community\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe' --preset vs2022-x64
-& 'C:\Program Files\Microsoft Visual Studio\2022\Community\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe' --build --preset step4-release
+& 'C:\Program Files\Microsoft Visual Studio\2022\Community\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe' --build --preset release
 ```
 
 `cmake` が PATH にある環境では以下でも同じです:
 
 ```powershell
 cmake --preset vs2022-x64
-cmake --build --preset step4-release
+cmake --build --preset release
 ```
 
 ビルド時に以下を自動実行します。
@@ -59,7 +59,7 @@ cmake --build --preset step4-release
 ## 実行
 
 ```powershell
-.\build\bin\Release\flutter_xr_step4.exe
+.\build\bin\Release\flutter_xr.exe
 ```
 
 実行には OpenXR Runtime と HMD 接続が必要です。終了はコンソールで `Esc` または `Q` です。
@@ -70,7 +70,7 @@ Quad にヒットしている場合はヒット位置まで、ヒットしてい
 ## CI / パッケージ化に向けた前提
 
 - ネイティブ処理は `flutter_xr_runtime` 静的ライブラリに集約済み
-- 実行バイナリ (`flutter_xr_step4`) は薄いエントリポイントのみ
+- 実行バイナリ (`flutter_xr`) は薄いエントリポイントのみ
 - Flutter アセット生成・embedder 配置は CMake のカスタムターゲット化済み
 
 このため、GitHub Actions では `--preset` ベースで同一手順を実行しやすく、将来的に Flutter パッケージ側から呼ぶランチャー/プラグイン層を追加しやすい構成です。

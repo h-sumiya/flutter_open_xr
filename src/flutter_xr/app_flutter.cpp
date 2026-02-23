@@ -62,7 +62,7 @@ void FlutterXrApp::InitializeFlutterEngine() {
     rendererConfig.software.struct_size = sizeof(FlutterSoftwareRendererConfig);
     rendererConfig.software.surface_present_callback = OnSurfacePresent;
 
-    const char* commandLineArgs[] = {"flutter_xr_step4", "--enable-impeller=false"};
+    const char* commandLineArgs[] = {"flutter_xr", "--enable-impeller=false"};
     FlutterProjectArgs projectArgs{};
     projectArgs.struct_size = sizeof(FlutterProjectArgs);
     projectArgs.assets_path = assetsPathUtf8_.c_str();
@@ -149,3 +149,5 @@ bool FlutterXrApp::UploadLatestFlutterFrame() {
 }
 
 }  // namespace flutter_xr
+
+

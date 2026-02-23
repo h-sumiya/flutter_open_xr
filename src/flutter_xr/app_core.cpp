@@ -52,7 +52,7 @@ void FlutterXrApp::Initialize() {
 }
 
 void FlutterXrApp::Run() {
-    std::cout << "Step4 input integration sample started.\n";
+    std::cout << "Flutter XR sample started.\n";
     std::cout << "Press ESC or Q in this console to exit.\n";
 
     while (!exitRequested_) {
@@ -99,7 +99,7 @@ void FlutterXrApp::CreateInstance() {
     }
 
     XrInstanceCreateInfo createInfo{XR_TYPE_INSTANCE_CREATE_INFO};
-    std::strncpy(createInfo.applicationInfo.applicationName, "flutter_xr_step4",
+    std::strncpy(createInfo.applicationInfo.applicationName, "flutter_xr",
                  sizeof(createInfo.applicationInfo.applicationName) - 1);
     createInfo.applicationInfo.applicationVersion = 1;
     std::strncpy(createInfo.applicationInfo.engineName, "custom", sizeof(createInfo.applicationInfo.engineName) - 1);
@@ -534,3 +534,5 @@ void FlutterXrApp::Shutdown() {
 }
 
 }  // namespace flutter_xr
+
+

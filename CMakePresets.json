@@ -19,12 +19,12 @@
   ],
   "buildPresets": [
     {
-      "name": "step4-release",
-      "displayName": "Build flutter_xr_step4 (Release)",
+      "name": "release",
+      "displayName": "Build flutter_xr (Release)",
       "configurePreset": "vs2022-x64",
       "configuration": "Release",
       "targets": [
-        "flutter_xr_step4"
+        "flutter_xr"
       ]
     }
   ]
