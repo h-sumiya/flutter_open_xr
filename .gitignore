@@ -6,3 +6,4 @@
 /.vs/
 /legacy/native_sample/.vs/
 /mise.local.toml
+/example/.dart_tool/

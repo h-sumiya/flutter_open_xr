@@ -26,6 +26,23 @@ dev_dependencies:
       url: https://example.invalid/your-repo.git
 ```
 
+## ローカルサンプル
+
+このリポジトリには `example/` に最小カウンターサンプルがあります。  
+`example/pubspec.yaml` では次のように親ディレクトリを `path` 参照しています。
+
+```yaml
+dev_dependencies:
+  flutter_open_xr:
+    path: ..
+```
+
+```powershell
+cd example
+flutter pub get
+dart run flutter_open_xr build --dry-run
+```
+
 ## 使い方
 
 ```powershell
