@@ -1,14 +1,15 @@
 # flutter_xr
 
-`PLAN.md` の手順1/2向けに、Windows 上の最小サンプルを用意しています。
+Windows 上で OpenXR 空間に Flutter UI を表示し、コントローラー入力を Flutter のポインタイベントへ変換するサンプルです。
+
+現在の実装は `flutter_xr_step4` のみを正式ターゲットとして扱います。
 
 ## 前提
 
 - Windows 10/11
 - Visual Studio 2022 (C++ ツールチェーン)
-- CMake 3.21+
 - Flutter SDK (`flutter` コマンドが PATH で実行可能)
-- OpenXR Runtime (例: Meta Quest Link / SteamVR など) が有効
+- OpenXR Runtime (Meta Quest Link / SteamVR など)
 - `reference/OpenXR-SDK` が存在すること
 
 `reference/OpenXR-SDK` が無い場合:
@@ -17,81 +18,56 @@
 git clone https://github.com/KhronosGroup/OpenXR-SDK.git reference/OpenXR-SDK
 ```
 
-## ビルド（共通）
+## プロジェクト構成
+
+- `src/flutter_xr/shared.*`
+  OpenXR/D3D 共通ユーティリティ、数値計算、例外補助
+- `src/flutter_xr/app_core.cpp`
+  OpenXR セッション管理、レンダーループ、終了処理
+- `src/flutter_xr/app_input.cpp`
+  OpenXR Action 入力、レイと Quad の交差判定、Flutter pointer 送信
+- `src/flutter_xr/app_flutter.cpp`
+  Flutter embedder 起動、オフスクリーンフレーム受信、D3D テクスチャ更新
+- `src/flutter_xr/main.cpp`
+  実行エントリポイント
+
+この分割により、スクロール・ドラッグなどの入力拡張は `app_input.cpp`、Flutter 統合変更は `app_flutter.cpp`、OpenXR 表示拡張は `app_core.cpp` に閉じて実装できます。
+
+## 再現性のあるビルド
+
+`CMakePresets.json` を使う手順:
 
 ```powershell
-cmake -S . -B build -G "Visual Studio 17 2022" -A x64
+& 'C:\Program Files\Microsoft Visual Studio\2022\Community\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe' --preset vs2022-x64
+& 'C:\Program Files\Microsoft Visual Studio\2022\Community\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe' --build --preset step4-release
 ```
 
-`cmake` が PATH に無い環境では、Visual Studio 付属の `cmake.exe` をフルパス指定してください。
-
-## 手順1サンプル: `xr_quad`
+`cmake` が PATH にある環境では以下でも同じです:
 
 ```powershell
-cmake --build build --config Release --target xr_quad
+cmake --preset vs2022-x64
+cmake --build --preset step4-release
 ```
 
-```powershell
-.\build\bin\Release\xr_quad.exe
-```
-
-実行すると、`LOCAL` 空間の前方約 1.2m にチェック柄の Quad を表示します。
-終了はコンソールで `Esc` または `Q` キーです。
-
-## 手順2サンプル: `flutter_offscreen`
-
-このターゲットは CMake 実行時に検出したインストール済み Flutter バージョンを使います。
 ビルド時に以下を自動実行します。
 
 - `flutter --version --machine` から `engineRevision` を取得
-- `https://storage.googleapis.com/flutter_infra_release/flutter/<engineRevision>/windows-x64/windows-x64-embedder.zip` を取得して展開
+- 対応する `windows-x64-embedder.zip` をダウンロードして展開
 - `flutter_samples/offscreen_ui` の `flutter pub get`
 - `flutter build bundle --debug --target-platform=windows-x64`
 
-```powershell
-cmake --build build --config Release --target flutter_offscreen
-```
-
-```powershell
-.\build\bin\Release\flutter_offscreen.exe
-```
-
-`flutter_offscreen.exe` は low-level embedder (`flutter_embedder.h`) で Flutter を起動し、オフスクリーン software surface の初回フレームコールバック到達を確認します（画面表示はしません）。
-
-実行に必要な `flutter_engine.dll` / `data/flutter_assets` はビルド時に実行ファイル横へ自動配置されます。`icudtl.dat` はローカル Flutter SDK キャッシュに存在する場合のみ追加で配置します。
-
-## 手順3サンプル: `flutter_xr_step3`（統合）
-
-このターゲットは手順1/2を統合したサンプルです。
-
-- OpenXR セッションと Flutter オフスクリーン描画で **同一の `ID3D11Device`** を共有
-- Flutter の software surface コールバックで受け取った最新フレームを D3D11 テクスチャへ更新
-- 毎フレーム OpenXR の Quad スワップチェーン画像へコピーして表示
-
-```powershell
-cmake --build build --config Release --target flutter_xr_step3
-```
-
-```powershell
-.\build\bin\Release\flutter_xr_step3.exe
-```
-
-実行には OpenXR Runtime と HMD 接続が必要です。終了はコンソールで `Esc` または `Q` キーです。
-
-## 手順4サンプル: `flutter_xr_step4`（入力・クリックのみ）
-
-このターゲットは手順3に加えて、OpenXR アクションから Flutter へのクリック入力を追加したサンプルです。
-
-- 右手コントローラーのポーズ（Ray）で Quad との交差位置を計算
-- 右手トリガー入力をしきい値判定して `FlutterEngineSendPointerEvent` の `kDown / kUp` を送信
-- まずはクリックのみ対応（ホバー/ドラッグは未対応）
-
-```powershell
-cmake --build build --config Release --target flutter_xr_step4
-```
+## 実行
 
 ```powershell
 .\build\bin\Release\flutter_xr_step4.exe
 ```
 
-Flutter サンプル画面には `Click me` ボタンと `click count` が表示され、トリガークリックでカウントが増えることを確認できます。
+実行には OpenXR Runtime と HMD 接続が必要です。終了はコンソールで `Esc` または `Q` です。
+
+## CI / パッケージ化に向けた前提
+
+- ネイティブ処理は `flutter_xr_runtime` 静的ライブラリに集約済み
+- 実行バイナリ (`flutter_xr_step4`) は薄いエントリポイントのみ
+- Flutter アセット生成・embedder 配置は CMake のカスタムターゲット化済み
+
+このため、GitHub Actions では `--preset` ベースで同一手順を実行しやすく、将来的に Flutter パッケージ側から呼ぶランチャー/プラグイン層を追加しやすい構成です。

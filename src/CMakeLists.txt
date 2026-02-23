@@ -14,28 +14,9 @@ function(configure_app_target target_name)
   endif()
 endfunction()
 
-add_executable(xr_quad xr_quad.cpp)
-
-target_compile_definitions(
-  xr_quad
-  PRIVATE
-    XR_USE_PLATFORM_WIN32
-    XR_USE_GRAPHICS_API_D3D11
-    WIN32_LEAN_AND_MEAN
-    NOMINMAX
-    _CRT_SECURE_NO_WARNINGS
-)
-
-target_link_libraries(xr_quad PRIVATE OpenXR::openxr_loader d3d11 dxgi ole32)
-configure_app_target(xr_quad)
-
 find_program(FLUTTER_EXECUTABLE NAMES flutter)
 if(NOT FLUTTER_EXECUTABLE)
-  message(
-    WARNING
-      "flutter command was not found. Skipping flutter_offscreen/flutter_xr_step3/flutter_xr_step4 targets."
-  )
-  return()
+  message(FATAL_ERROR "flutter command was not found. Please install Flutter SDK and add it to PATH.")
 endif()
 
 # When flutter is resolved to a shim without extension, execute the .cmd wrapper.
@@ -59,11 +40,7 @@ execute_process(
 )
 
 if(NOT FLUTTER_VERSION_RESULT EQUAL 0)
-  message(
-    WARNING
-      "Failed to execute 'flutter --version --machine' using '${FLUTTER_EXECUTABLE}'. stderr: ${FLUTTER_VERSION_STDERR}"
-  )
-  return()
+  message(FATAL_ERROR "Failed to execute 'flutter --version --machine' using '${FLUTTER_EXECUTABLE}'. stderr: ${FLUTTER_VERSION_STDERR}")
 endif()
 
 string(JSON FLUTTER_ROOT_RAW ERROR_VARIABLE FLUTTER_ROOT_JSON_ERROR GET "${FLUTTER_VERSION_JSON}" flutterRoot)
@@ -71,11 +48,7 @@ string(JSON FLUTTER_VERSION ERROR_VARIABLE FLUTTER_VERSION_JSON_ERROR GET "${FLU
 string(JSON FLUTTER_ENGINE_REVISION ERROR_VARIABLE FLUTTER_ENGINE_JSON_ERROR GET "${FLUTTER_VERSION_JSON}" engineRevision)
 
 if(FLUTTER_ROOT_JSON_ERROR OR FLUTTER_VERSION_JSON_ERROR OR FLUTTER_ENGINE_JSON_ERROR)
-  message(
-    WARNING
-      "Failed to parse Flutter version json. Skipping flutter_offscreen target."
-  )
-  return()
+  message(FATAL_ERROR "Failed to parse Flutter version json. Check flutter installation output.")
 endif()
 
 file(TO_CMAKE_PATH "${FLUTTER_ROOT_RAW}" FLUTTER_ROOT)
@@ -116,7 +89,7 @@ add_custom_command(
   COMMENT "Downloading Flutter embedder (${FLUTTER_ENGINE_REVISION})"
   VERBATIM
 )
-add_custom_target(flutter_step2_embedder DEPENDS "${FLUTTER_EMBEDDER_STAMP}")
+add_custom_target(flutter_embedder_runtime DEPENDS "${FLUTTER_EMBEDDER_STAMP}")
 
 add_custom_command(
   OUTPUT "${FLUTTER_PACKAGE_CONFIG}"
@@ -142,117 +115,49 @@ add_custom_command(
   COMMENT "Building Flutter offscreen sample assets"
   VERBATIM
 )
-add_custom_target(flutter_step2_assets DEPENDS "${FLUTTER_BUNDLE_STAMP}")
+add_custom_target(flutter_assets_runtime DEPENDS "${FLUTTER_BUNDLE_STAMP}")
 
-add_executable(flutter_offscreen flutter_offscreen.cpp)
-target_include_directories(flutter_offscreen PRIVATE "${FLUTTER_EMBEDDER_DIR}")
-target_compile_definitions(
-  flutter_offscreen
-  PRIVATE
-    WIN32_LEAN_AND_MEAN
-    NOMINMAX
-    _CRT_SECURE_NO_WARNINGS
-)
-target_link_libraries(flutter_offscreen PRIVATE "${FLUTTER_ENGINE_IMPORT_LIB}")
-add_dependencies(flutter_offscreen flutter_step2_embedder flutter_step2_assets)
-configure_app_target(flutter_offscreen)
-
-add_custom_command(
-  TARGET flutter_offscreen
-  POST_BUILD
-  COMMAND ${CMAKE_COMMAND} -E copy_if_different "${FLUTTER_ENGINE_DLL}"
-          "$<TARGET_FILE_DIR:flutter_offscreen>/flutter_engine.dll"
-  COMMAND ${CMAKE_COMMAND} -E make_directory "$<TARGET_FILE_DIR:flutter_offscreen>/data"
-  COMMAND ${CMAKE_COMMAND} -E copy_directory "${FLUTTER_ASSET_DIR}"
-          "$<TARGET_FILE_DIR:flutter_offscreen>/data/flutter_assets"
-  COMMENT "Copying Flutter runtime files next to flutter_offscreen"
+add_library(
+  flutter_xr_runtime
+  STATIC
+    flutter_xr/shared.cpp
+    flutter_xr/app_core.cpp
+    flutter_xr/app_input.cpp
+    flutter_xr/app_flutter.cpp
 )
 
-if(EXISTS "${FLUTTER_ICUDTL_SOURCE}")
-  add_custom_command(
-    TARGET flutter_offscreen
-    POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different "${FLUTTER_ICUDTL_SOURCE}"
-            "$<TARGET_FILE_DIR:flutter_offscreen>/icudtl.dat"
-    COMMENT "Copying icudtl.dat from local Flutter SDK cache"
-  )
-else()
-  message(
-    WARNING
-      "icudtl.dat was not found at ${FLUTTER_ICUDTL_SOURCE}. flutter_offscreen may fail at runtime."
-  )
-endif()
+target_include_directories(
+  flutter_xr_runtime
+  PUBLIC
+    "${CMAKE_CURRENT_SOURCE_DIR}"
+    "${FLUTTER_EMBEDDER_DIR}"
+)
 
-add_executable(flutter_xr_step3 flutter_xr_step3.cpp)
-target_include_directories(flutter_xr_step3 PRIVATE "${FLUTTER_EMBEDDER_DIR}")
 target_compile_definitions(
-  flutter_xr_step3
-  PRIVATE
+  flutter_xr_runtime
+  PUBLIC
     XR_USE_PLATFORM_WIN32
     XR_USE_GRAPHICS_API_D3D11
     WIN32_LEAN_AND_MEAN
     NOMINMAX
     _CRT_SECURE_NO_WARNINGS
 )
+
 target_link_libraries(
-  flutter_xr_step3
-  PRIVATE
+  flutter_xr_runtime
+  PUBLIC
     OpenXR::openxr_loader
     d3d11
     dxgi
     ole32
     "${FLUTTER_ENGINE_IMPORT_LIB}"
 )
-add_dependencies(flutter_xr_step3 flutter_step2_embedder flutter_step2_assets)
-configure_app_target(flutter_xr_step3)
 
-add_custom_command(
-  TARGET flutter_xr_step3
-  POST_BUILD
-  COMMAND ${CMAKE_COMMAND} -E copy_if_different "${FLUTTER_ENGINE_DLL}"
-          "$<TARGET_FILE_DIR:flutter_xr_step3>/flutter_engine.dll"
-  COMMAND ${CMAKE_COMMAND} -E make_directory "$<TARGET_FILE_DIR:flutter_xr_step3>/data"
-  COMMAND ${CMAKE_COMMAND} -E copy_directory "${FLUTTER_ASSET_DIR}"
-          "$<TARGET_FILE_DIR:flutter_xr_step3>/data/flutter_assets"
-  COMMENT "Copying Flutter runtime files next to flutter_xr_step3"
-)
+add_dependencies(flutter_xr_runtime flutter_embedder_runtime flutter_assets_runtime)
 
-if(EXISTS "${FLUTTER_ICUDTL_SOURCE}")
-  add_custom_command(
-    TARGET flutter_xr_step3
-    POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different "${FLUTTER_ICUDTL_SOURCE}"
-            "$<TARGET_FILE_DIR:flutter_xr_step3>/icudtl.dat"
-    COMMENT "Copying icudtl.dat from local Flutter SDK cache"
-  )
-else()
-  message(
-    WARNING
-      "icudtl.dat was not found at ${FLUTTER_ICUDTL_SOURCE}. flutter_xr_step3 may fail at runtime."
-  )
-endif()
-
-add_executable(flutter_xr_step4 flutter_xr_step4.cpp)
-target_include_directories(flutter_xr_step4 PRIVATE "${FLUTTER_EMBEDDER_DIR}")
-target_compile_definitions(
-  flutter_xr_step4
-  PRIVATE
-    XR_USE_PLATFORM_WIN32
-    XR_USE_GRAPHICS_API_D3D11
-    WIN32_LEAN_AND_MEAN
-    NOMINMAX
-    _CRT_SECURE_NO_WARNINGS
-)
-target_link_libraries(
-  flutter_xr_step4
-  PRIVATE
-    OpenXR::openxr_loader
-    d3d11
-    dxgi
-    ole32
-    "${FLUTTER_ENGINE_IMPORT_LIB}"
-)
-add_dependencies(flutter_xr_step4 flutter_step2_embedder flutter_step2_assets)
+add_executable(flutter_xr_step4 flutter_xr/main.cpp)
+target_link_libraries(flutter_xr_step4 PRIVATE flutter_xr_runtime)
+add_dependencies(flutter_xr_step4 flutter_embedder_runtime flutter_assets_runtime)
 configure_app_target(flutter_xr_step4)
 
 add_custom_command(
@@ -275,8 +180,5 @@ if(EXISTS "${FLUTTER_ICUDTL_SOURCE}")
     COMMENT "Copying icudtl.dat from local Flutter SDK cache"
   )
 else()
-  message(
-    WARNING
-      "icudtl.dat was not found at ${FLUTTER_ICUDTL_SOURCE}. flutter_xr_step4 may fail at runtime."
-  )
+  message(WARNING "icudtl.dat was not found at ${FLUTTER_ICUDTL_SOURCE}. flutter_xr_step4 may fail at runtime.")
 endif()
