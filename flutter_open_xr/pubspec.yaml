@@ -1,7 +1,7 @@
 name: flutter_open_xr
 description: CLI package to build Flutter projects into a Windows OpenXR runtime host.
 version: 0.1.0
-publish_to: "none"
+# publish_to: "none"
 
 environment:
   sdk: ">=3.3.0 <4.0.0"
