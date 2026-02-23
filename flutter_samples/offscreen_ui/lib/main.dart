@@ -16,6 +16,7 @@ class OffscreenDemoApp extends StatefulWidget {
 class _OffscreenDemoAppState extends State<OffscreenDemoApp>
     with SingleTickerProviderStateMixin {
   late final AnimationController _controller;
+  int _clickCount = 0;
 
   @override
   void initState() {
@@ -92,6 +93,20 @@ class _OffscreenDemoAppState extends State<OffscreenDemoApp>
                         const Text(
                           'Rendered by Flutter software callback',
                           style: TextStyle(fontSize: 16, color: Colors.white70),
+                        ),
+                        const SizedBox(height: 20),
+                        FilledButton.tonal(
+                          onPressed: () {
+                            setState(() {
+                              _clickCount += 1;
+                            });
+                          },
+                          child: const Text('Click me'),
+                        ),
+                        const SizedBox(height: 10),
+                        Text(
+                          'click count: $_clickCount',
+                          style: const TextStyle(fontSize: 18),
                         ),
                       ],
                     ),

@@ -33,7 +33,7 @@ find_program(FLUTTER_EXECUTABLE NAMES flutter)
 if(NOT FLUTTER_EXECUTABLE)
   message(
     WARNING
-      "flutter command was not found. Skipping flutter_offscreen/flutter_xr_step3 targets."
+      "flutter command was not found. Skipping flutter_offscreen/flutter_xr_step3/flutter_xr_step4 targets."
   )
   return()
 endif()
@@ -229,5 +229,54 @@ else()
   message(
     WARNING
       "icudtl.dat was not found at ${FLUTTER_ICUDTL_SOURCE}. flutter_xr_step3 may fail at runtime."
+  )
+endif()
+
+add_executable(flutter_xr_step4 flutter_xr_step4.cpp)
+target_include_directories(flutter_xr_step4 PRIVATE "${FLUTTER_EMBEDDER_DIR}")
+target_compile_definitions(
+  flutter_xr_step4
+  PRIVATE
+    XR_USE_PLATFORM_WIN32
+    XR_USE_GRAPHICS_API_D3D11
+    WIN32_LEAN_AND_MEAN
+    NOMINMAX
+    _CRT_SECURE_NO_WARNINGS
+)
+target_link_libraries(
+  flutter_xr_step4
+  PRIVATE
+    OpenXR::openxr_loader
+    d3d11
+    dxgi
+    ole32
+    "${FLUTTER_ENGINE_IMPORT_LIB}"
+)
+add_dependencies(flutter_xr_step4 flutter_step2_embedder flutter_step2_assets)
+configure_app_target(flutter_xr_step4)
+
+add_custom_command(
+  TARGET flutter_xr_step4
+  POST_BUILD
+  COMMAND ${CMAKE_COMMAND} -E copy_if_different "${FLUTTER_ENGINE_DLL}"
+          "$<TARGET_FILE_DIR:flutter_xr_step4>/flutter_engine.dll"
+  COMMAND ${CMAKE_COMMAND} -E make_directory "$<TARGET_FILE_DIR:flutter_xr_step4>/data"
+  COMMAND ${CMAKE_COMMAND} -E copy_directory "${FLUTTER_ASSET_DIR}"
+          "$<TARGET_FILE_DIR:flutter_xr_step4>/data/flutter_assets"
+  COMMENT "Copying Flutter runtime files next to flutter_xr_step4"
+)
+
+if(EXISTS "${FLUTTER_ICUDTL_SOURCE}")
+  add_custom_command(
+    TARGET flutter_xr_step4
+    POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different "${FLUTTER_ICUDTL_SOURCE}"
+            "$<TARGET_FILE_DIR:flutter_xr_step4>/icudtl.dat"
+    COMMENT "Copying icudtl.dat from local Flutter SDK cache"
+  )
+else()
+  message(
+    WARNING
+      "icudtl.dat was not found at ${FLUTTER_ICUDTL_SOURCE}. flutter_xr_step4 may fail at runtime."
   )
 endif()

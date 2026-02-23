@@ -77,3 +77,21 @@ cmake --build build --config Release --target flutter_xr_step3
 ```
 
 実行には OpenXR Runtime と HMD 接続が必要です。終了はコンソールで `Esc` または `Q` キーです。
+
+## 手順4サンプル: `flutter_xr_step4`（入力・クリックのみ）
+
+このターゲットは手順3に加えて、OpenXR アクションから Flutter へのクリック入力を追加したサンプルです。
+
+- 右手コントローラーのポーズ（Ray）で Quad との交差位置を計算
+- 右手トリガー入力をしきい値判定して `FlutterEngineSendPointerEvent` の `kDown / kUp` を送信
+- まずはクリックのみ対応（ホバー/ドラッグは未対応）
+
+```powershell
+cmake --build build --config Release --target flutter_xr_step4
+```
+
+```powershell
+.\build\bin\Release\flutter_xr_step4.exe
+```
+
+Flutter サンプル画面には `Click me` ボタンと `click count` が表示され、トリガークリックでカウントが増えることを確認できます。
