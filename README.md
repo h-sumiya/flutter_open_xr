@@ -1,6 +1,7 @@
 # flutter_open_xr
 
 `flutter_open_xr` は、任意の Flutter プロジェクトを Windows 向け OpenXR ホストで実行するための CLI パッケージです。
+このリポジトリのルートがそのまま Dart パッケージになっています。
 
 `dev_dependencies` に追加して、対象プロジェクト側で次を実行します。
 
@@ -23,7 +24,6 @@ dev_dependencies:
   flutter_open_xr:
     git:
       url: https://example.invalid/your-repo.git
-      path: flutter_open_xr
 ```
 
 ## 使い方
@@ -66,3 +66,8 @@ flutter_open_xr_runner.exe
 - CMake
 - Flutter SDK
 - OpenXR Runtime (Quest Link / SteamVR など)
+
+## 旧構成のメモ
+
+以前のネイティブ検証プロジェクトは `legacy/native_sample/` に移動し、
+関連メモは `docs/legacy_native_sample/` に移動しています。

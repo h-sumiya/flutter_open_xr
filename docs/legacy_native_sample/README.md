@@ -1,5 +1,8 @@
 # flutter_xr
 
+> 注: この検証プロジェクト本体は `legacy/native_sample/` に移動しています。
+> CMake 実行時は `-S legacy/native_sample -B legacy/native_sample/build` のように明示してください。
+
 Windows 上で OpenXR 空間に Flutter UI を表示し、コントローラー入力を Flutter のポインタイベントへ変換するサンプルです。
 
 現在の実装は `flutter_xr` ターゲットを正式ターゲットとして扱います。

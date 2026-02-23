@@ -9,11 +9,11 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
-set(OPENXR_SDK_DIR "${CMAKE_SOURCE_DIR}/reference/OpenXR-SDK")
+set(OPENXR_SDK_DIR "${CMAKE_SOURCE_DIR}/../../reference/OpenXR-SDK")
 if(NOT EXISTS "${OPENXR_SDK_DIR}/CMakeLists.txt")
   message(
     FATAL_ERROR
-      "Missing ${OPENXR_SDK_DIR}. Please clone OpenXR-SDK into reference/OpenXR-SDK."
+      "Missing ${OPENXR_SDK_DIR}. Please clone OpenXR-SDK into ../../reference/OpenXR-SDK."
   )
 endif()
 

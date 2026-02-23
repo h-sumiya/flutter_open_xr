@@ -1,4 +1,8 @@
-/reference
-/build
-/.vs
+/.dart_tool/
+/pubspec.lock
+/build/
+/legacy/native_sample/build/
+/reference/
+/.vs/
+/legacy/native_sample/.vs/
 /mise.local.toml
