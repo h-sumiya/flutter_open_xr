@@ -6,6 +6,12 @@
 
 namespace flutter_xr {
 
+namespace {
+
+constexpr XrQuaternionf kRayAlignmentFromController = {0.0f, -0.70710677f, 0.0f, 0.70710677f};
+
+}  // namespace
+
 void FlutterXrApp::SuggestBindings(XrPath interactionProfile, const std::vector<XrActionSuggestedBinding>& bindings) {
     XrInteractionProfileSuggestedBinding suggestedBindings{XR_TYPE_INTERACTION_PROFILE_SUGGESTED_BINDING};
     suggestedBindings.interactionProfile = interactionProfile;
@@ -128,11 +134,17 @@ PointerHitResult FlutterXrApp::QueryPointerHit(XrTime predictedDisplayTime) {
     }
 
     const XrVector3f rayForward = RotateVector(pointerLocation.pose.orientation, XrVector3f{0.0f, 0.0f, -1.0f});
+    result.hasPose = true;
+    result.rayOriginWorld = pointerLocation.pose.position;
+    result.rayDirectionWorld = Normalize(rayForward);
+    result.pointerOrientation = pointerLocation.pose.orientation;
+
     const XrPosef quadPose = MakeQuadPose();
 
     double u = 0.0;
     double v = 0.0;
-    if (!IntersectRayWithQuad(pointerLocation.pose.position, rayForward, quadPose, kQuadWidthMeters, kQuadHeightMeters,
+    if (!IntersectRayWithQuad(pointerLocation.pose.position, result.rayDirectionWorld, quadPose, kQuadWidthMeters, kQuadHeightMeters,
+                              &result.hitDistanceMeters,
                               &u, &v)) {
         return result;
     }
@@ -182,7 +194,7 @@ void FlutterXrApp::EnsureFlutterPointerAdded(double xPixels, double yPixels) {
 }
 
 void FlutterXrApp::PollInput(XrTime predictedDisplayTime) {
-    if (inputActionSet_ == XR_NULL_HANDLE || flutterEngine_ == nullptr) {
+    if (inputActionSet_ == XR_NULL_HANDLE) {
         return;
     }
 
@@ -192,6 +204,7 @@ void FlutterXrApp::PollInput(XrTime predictedDisplayTime) {
             pointerDown_ = false;
         }
         triggerPressed_ = false;
+        pointerRayVisible_ = false;
         return;
     }
 
@@ -202,6 +215,17 @@ void FlutterXrApp::PollInput(XrTime predictedDisplayTime) {
     ThrowIfXrFailed(xrSyncActions(session_, &syncInfo), "xrSyncActions", instance_);
 
     const PointerHitResult hit = QueryPointerHit(predictedDisplayTime);
+    if (hit.hasPose) {
+        const float rayLength = hit.onQuad
+                                    ? std::clamp(hit.hitDistanceMeters, kPointerRayMinLengthMeters, kPointerRayFallbackLengthMeters)
+                                    : kPointerRayFallbackLengthMeters;
+        pointerRayLengthMeters_ = rayLength;
+        pointerRayPose_.orientation = Multiply(hit.pointerOrientation, kRayAlignmentFromController);
+        pointerRayPose_.position = Add(hit.rayOriginWorld, Scale(hit.rayDirectionWorld, rayLength * 0.5f));
+        pointerRayVisible_ = true;
+    } else {
+        pointerRayVisible_ = false;
+    }
 
     XrActionStateGetInfo triggerGetInfo{XR_TYPE_ACTION_STATE_GET_INFO};
     triggerGetInfo.action = triggerValueAction_;
@@ -216,14 +240,14 @@ void FlutterXrApp::PollInput(XrTime predictedDisplayTime) {
         triggerPressed_ ? (triggerValue >= kTriggerReleaseThreshold) : (triggerValue >= kTriggerPressThreshold);
 
     if (pressedNow && !triggerPressed_) {
-        if (hit.onQuad) {
+        if (hit.onQuad && flutterEngine_ != nullptr) {
             EnsureFlutterPointerAdded(hit.xPixels, hit.yPixels);
             if (pointerAdded_ && SendFlutterPointerEvent(kDown, hit.xPixels, hit.yPixels, kFlutterPointerButtonMousePrimary)) {
                 pointerDown_ = true;
             }
         }
     } else if ((!pressedNow || !inputActive) && triggerPressed_) {
-        if (pointerDown_) {
+        if (pointerDown_ && flutterEngine_ != nullptr) {
             const double upX = hit.onQuad ? hit.xPixels : lastPointerX_;
             const double upY = hit.onQuad ? hit.yPixels : lastPointerY_;
             SendFlutterPointerEvent(kUp, upX, upY, 0);

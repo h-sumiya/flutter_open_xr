@@ -210,6 +210,15 @@ XrQuaternionf Conjugate(const XrQuaternionf& value) {
     return {-value.x, -value.y, -value.z, value.w};
 }
 
+XrQuaternionf Multiply(const XrQuaternionf& lhs, const XrQuaternionf& rhs) {
+    return {
+        lhs.w * rhs.x + lhs.x * rhs.w + lhs.y * rhs.z - lhs.z * rhs.y,
+        lhs.w * rhs.y - lhs.x * rhs.z + lhs.y * rhs.w + lhs.z * rhs.x,
+        lhs.w * rhs.z + lhs.x * rhs.y - lhs.y * rhs.x + lhs.z * rhs.w,
+        lhs.w * rhs.w - lhs.x * rhs.x - lhs.y * rhs.y - lhs.z * rhs.z,
+    };
+}
+
 XrVector3f RotateVector(const XrQuaternionf& rotation, const XrVector3f& value) {
     const XrVector3f qv{rotation.x, rotation.y, rotation.z};
     const XrVector3f term1 = Scale(qv, 2.0f * Dot(qv, value));
@@ -232,6 +241,7 @@ bool IntersectRayWithQuad(const XrVector3f& rayOriginWorld,
                           const XrPosef& quadPoseWorld,
                           float quadWidthMeters,
                           float quadHeightMeters,
+                          float* outHitDistanceMeters,
                           double* outU,
                           double* outV) {
     if (outU == nullptr || outV == nullptr || quadWidthMeters <= 0.0f || quadHeightMeters <= 0.0f) {
@@ -260,6 +270,9 @@ bool IntersectRayWithQuad(const XrVector3f& rayOriginWorld,
 
     *outU = static_cast<double>(hit.x / quadWidthMeters + 0.5f);
     *outV = static_cast<double>(0.5f - hit.y / quadHeightMeters);
+    if (outHitDistanceMeters != nullptr) {
+        *outHitDistanceMeters = t;
+    }
     return true;
 }
 

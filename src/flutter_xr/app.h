@@ -29,7 +29,12 @@ struct FlutterBridgeState {
 };
 
 struct PointerHitResult {
+    bool hasPose = false;
     bool onQuad = false;
+    float hitDistanceMeters = 0.0f;
+    XrVector3f rayOriginWorld{0.0f, 0.0f, 0.0f};
+    XrVector3f rayDirectionWorld{0.0f, 0.0f, -1.0f};
+    XrQuaternionf pointerOrientation{0.0f, 0.0f, 0.0f, 1.0f};
     double xPixels = static_cast<double>(kFlutterSurfaceWidth) * 0.5;
     double yPixels = static_cast<double>(kFlutterSurfaceHeight) * 0.5;
 };
@@ -56,7 +61,9 @@ class FlutterXrApp {
     void PollInput(XrTime predictedDisplayTime);
 
     void CreateQuadSwapchain();
+    void CreatePointerRaySwapchain();
     void CreateFlutterTexture();
+    void CreatePointerRayTexture();
 
     void InitializeFlutterEngine();
     bool UploadLatestFlutterFrame();
@@ -72,6 +79,7 @@ class FlutterXrApp {
     XrSpace appSpace_{XR_NULL_HANDLE};
     XrSpace pointerSpace_{XR_NULL_HANDLE};
     XrSwapchain quadSwapchain_{XR_NULL_HANDLE};
+    XrSwapchain pointerRaySwapchain_{XR_NULL_HANDLE};
     XrActionSet inputActionSet_{XR_NULL_HANDLE};
     XrAction pointerPoseAction_{XR_NULL_HANDLE};
     XrAction triggerValueAction_{XR_NULL_HANDLE};
@@ -86,6 +94,9 @@ class FlutterXrApp {
     bool triggerPressed_{false};
     bool pointerAdded_{false};
     bool pointerDown_{false};
+    bool pointerRayVisible_{false};
+    float pointerRayLengthMeters_{0.0f};
+    XrPosef pointerRayPose_{};
     double lastPointerX_{static_cast<double>(kFlutterSurfaceWidth) * 0.5};
     double lastPointerY_{static_cast<double>(kFlutterSurfaceHeight) * 0.5};
 
@@ -95,7 +106,9 @@ class FlutterXrApp {
     bool isBgraFormat_{false};
 
     std::vector<XrSwapchainImageD3D11KHR> quadImages_;
+    std::vector<XrSwapchainImageD3D11KHR> pointerRayImages_;
     ComPtr<ID3D11Texture2D> flutterTexture_;
+    ComPtr<ID3D11Texture2D> pointerRayTexture_;
     FlutterEngine flutterEngine_{nullptr};
     FlutterBridgeState flutterBridge_;
     uint64_t uploadedFrameIndex_{0};

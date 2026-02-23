@@ -13,6 +13,19 @@
 
 namespace flutter_xr {
 
+namespace {
+
+uint32_t PackColor(uint8_t r, uint8_t g, uint8_t b, uint8_t a, bool bgraFormat) {
+    if (bgraFormat) {
+        return static_cast<uint32_t>(b) | (static_cast<uint32_t>(g) << 8U) | (static_cast<uint32_t>(r) << 16U) |
+               (static_cast<uint32_t>(a) << 24U);
+    }
+    return static_cast<uint32_t>(r) | (static_cast<uint32_t>(g) << 8U) | (static_cast<uint32_t>(b) << 16U) |
+           (static_cast<uint32_t>(a) << 24U);
+}
+
+}  // namespace
+
 FlutterXrApp::~FlutterXrApp() {
     try {
         Shutdown();
@@ -27,9 +40,14 @@ void FlutterXrApp::Initialize() {
     InitializeD3D11Device();
     CreateSession();
     CreateReferenceSpace();
+    pointerRayPose_.orientation = {0.0f, 0.0f, 0.0f, 1.0f};
+    pointerRayPose_.position = {0.0f, 0.0f, 0.0f};
+    pointerRayLengthMeters_ = kPointerRayFallbackLengthMeters;
     InitializeInputActions();
     CreateQuadSwapchain();
+    CreatePointerRaySwapchain();
     CreateFlutterTexture();
+    CreatePointerRayTexture();
     InitializeFlutterEngine();
 }
 
@@ -213,6 +231,35 @@ void FlutterXrApp::CreateQuadSwapchain() {
                     "xrEnumerateSwapchainImages(data)", instance_);
 }
 
+void FlutterXrApp::CreatePointerRaySwapchain() {
+    XrSwapchainCreateInfo swapchainCreateInfo{XR_TYPE_SWAPCHAIN_CREATE_INFO};
+    swapchainCreateInfo.createFlags = 0;
+    swapchainCreateInfo.usageFlags = XR_SWAPCHAIN_USAGE_SAMPLED_BIT | XR_SWAPCHAIN_USAGE_COLOR_ATTACHMENT_BIT;
+    swapchainCreateInfo.format = static_cast<int64_t>(colorFormat_);
+    swapchainCreateInfo.sampleCount = 1;
+    swapchainCreateInfo.width = kPointerRayTextureWidth;
+    swapchainCreateInfo.height = kPointerRayTextureHeight;
+    swapchainCreateInfo.faceCount = 1;
+    swapchainCreateInfo.arraySize = 1;
+    swapchainCreateInfo.mipCount = 1;
+
+    ThrowIfXrFailed(xrCreateSwapchain(session_, &swapchainCreateInfo, &pointerRaySwapchain_), "xrCreateSwapchain(pointerRay)",
+                    instance_);
+
+    uint32_t imageCount = 0;
+    ThrowIfXrFailed(xrEnumerateSwapchainImages(pointerRaySwapchain_, 0, &imageCount, nullptr),
+                    "xrEnumerateSwapchainImages(pointerRay count)", instance_);
+    if (imageCount == 0) {
+        throw std::runtime_error("Runtime returned zero pointer-ray swapchain images.");
+    }
+
+    pointerRayImages_.resize(imageCount, {XR_TYPE_SWAPCHAIN_IMAGE_D3D11_KHR});
+    ThrowIfXrFailed(
+        xrEnumerateSwapchainImages(pointerRaySwapchain_, imageCount, &imageCount,
+                                   reinterpret_cast<XrSwapchainImageBaseHeader*>(pointerRayImages_.data())),
+        "xrEnumerateSwapchainImages(pointerRay data)", instance_);
+}
+
 void FlutterXrApp::CreateFlutterTexture() {
     D3D11_TEXTURE2D_DESC desc{};
     desc.Width = static_cast<UINT>(kFlutterSurfaceWidth);
@@ -234,6 +281,30 @@ void FlutterXrApp::CreateFlutterTexture() {
         static_cast<size_t>(kFlutterSurfaceWidth) * static_cast<size_t>(kFlutterSurfaceHeight), 0xFF101010u);
     deviceContext_->UpdateSubresource(flutterTexture_.Get(), 0, nullptr, initialPixels.data(),
                                       static_cast<UINT>(kFlutterSurfaceWidth * sizeof(uint32_t)), 0);
+}
+
+void FlutterXrApp::CreatePointerRayTexture() {
+    D3D11_TEXTURE2D_DESC desc{};
+    desc.Width = static_cast<UINT>(kPointerRayTextureWidth);
+    desc.Height = static_cast<UINT>(kPointerRayTextureHeight);
+    desc.MipLevels = 1;
+    desc.ArraySize = 1;
+    desc.Format = colorFormat_;
+    desc.SampleDesc.Count = 1;
+    desc.SampleDesc.Quality = 0;
+    desc.Usage = D3D11_USAGE_DEFAULT;
+    desc.BindFlags = 0;
+    desc.CPUAccessFlags = 0;
+    desc.MiscFlags = 0;
+
+    ThrowIfFailed(device_->CreateTexture2D(&desc, nullptr, pointerRayTexture_.ReleaseAndGetAddressOf()),
+                  "ID3D11Device::CreateTexture2D(pointerRayTexture)");
+
+    const uint32_t rayColor = PackColor(100, 220, 255, 230, isBgraFormat_);
+    const std::vector<uint32_t> pixels(static_cast<size_t>(kPointerRayTextureWidth) * static_cast<size_t>(kPointerRayTextureHeight),
+                                       rayColor);
+    deviceContext_->UpdateSubresource(pointerRayTexture_.Get(), 0, nullptr, pixels.data(),
+                                      static_cast<UINT>(kPointerRayTextureWidth * sizeof(uint32_t)), 0);
 }
 
 void FlutterXrApp::PollEvents() {
@@ -280,6 +351,7 @@ void FlutterXrApp::HandleSessionStateChanged(const XrEventDataSessionStateChange
                 pointerDown_ = false;
             }
             triggerPressed_ = false;
+            pointerRayVisible_ = false;
             sessionRunning_ = false;
             ThrowIfXrFailed(xrEndSession(session_), "xrEndSession", instance_);
             std::cout << "Session stopping.\n";
@@ -291,6 +363,7 @@ void FlutterXrApp::HandleSessionStateChanged(const XrEventDataSessionStateChange
                 pointerDown_ = false;
             }
             triggerPressed_ = false;
+            pointerRayVisible_ = false;
             sessionRunning_ = false;
             exitRequested_ = true;
             break;
@@ -310,25 +383,27 @@ void FlutterXrApp::RenderFrame() {
     ThrowIfXrFailed(xrBeginFrame(session_, &frameBeginInfo), "xrBeginFrame", instance_);
 
     XrCompositionLayerQuad quadLayer{XR_TYPE_COMPOSITION_LAYER_QUAD};
-    std::array<XrCompositionLayerBaseHeader*, 1> layers{};
+    XrCompositionLayerQuad pointerRayLayer{XR_TYPE_COMPOSITION_LAYER_QUAD};
+    std::array<XrCompositionLayerBaseHeader*, 2> layers{};
     uint32_t layerCount = 0;
 
     if (frameState.shouldRender == XR_TRUE) {
-        uint32_t imageIndex = 0;
-        XrSwapchainImageAcquireInfo acquireInfo{XR_TYPE_SWAPCHAIN_IMAGE_ACQUIRE_INFO};
-        ThrowIfXrFailed(xrAcquireSwapchainImage(quadSwapchain_, &acquireInfo, &imageIndex), "xrAcquireSwapchainImage",
-                        instance_);
+        {
+            uint32_t imageIndex = 0;
+            XrSwapchainImageAcquireInfo acquireInfo{XR_TYPE_SWAPCHAIN_IMAGE_ACQUIRE_INFO};
+            ThrowIfXrFailed(xrAcquireSwapchainImage(quadSwapchain_, &acquireInfo, &imageIndex), "xrAcquireSwapchainImage",
+                            instance_);
 
-        XrSwapchainImageWaitInfo waitInfo{XR_TYPE_SWAPCHAIN_IMAGE_WAIT_INFO};
-        waitInfo.timeout = XR_INFINITE_DURATION;
-        ThrowIfXrFailed(xrWaitSwapchainImage(quadSwapchain_, &waitInfo), "xrWaitSwapchainImage", instance_);
+            XrSwapchainImageWaitInfo waitInfo{XR_TYPE_SWAPCHAIN_IMAGE_WAIT_INFO};
+            waitInfo.timeout = XR_INFINITE_DURATION;
+            ThrowIfXrFailed(xrWaitSwapchainImage(quadSwapchain_, &waitInfo), "xrWaitSwapchainImage", instance_);
 
-        UploadLatestFlutterFrame();
-        deviceContext_->CopyResource(quadImages_[imageIndex].texture, flutterTexture_.Get());
-        deviceContext_->Flush();
+            UploadLatestFlutterFrame();
+            deviceContext_->CopyResource(quadImages_[imageIndex].texture, flutterTexture_.Get());
 
-        XrSwapchainImageReleaseInfo releaseInfo{XR_TYPE_SWAPCHAIN_IMAGE_RELEASE_INFO};
-        ThrowIfXrFailed(xrReleaseSwapchainImage(quadSwapchain_, &releaseInfo), "xrReleaseSwapchainImage", instance_);
+            XrSwapchainImageReleaseInfo releaseInfo{XR_TYPE_SWAPCHAIN_IMAGE_RELEASE_INFO};
+            ThrowIfXrFailed(xrReleaseSwapchainImage(quadSwapchain_, &releaseInfo), "xrReleaseSwapchainImage", instance_);
+        }
 
         quadLayer.space = appSpace_;
         quadLayer.eyeVisibility = XR_EYE_VISIBILITY_BOTH;
@@ -339,8 +414,38 @@ void FlutterXrApp::RenderFrame() {
         quadLayer.pose = MakeQuadPose();
         quadLayer.size = {kQuadWidthMeters, kQuadHeightMeters};
 
-        layers[0] = reinterpret_cast<XrCompositionLayerBaseHeader*>(&quadLayer);
-        layerCount = 1;
+        layers[layerCount++] = reinterpret_cast<XrCompositionLayerBaseHeader*>(&quadLayer);
+
+        if (pointerRayVisible_ && pointerRaySwapchain_ != XR_NULL_HANDLE && pointerRayTexture_ != nullptr) {
+            uint32_t rayImageIndex = 0;
+            XrSwapchainImageAcquireInfo acquireInfo{XR_TYPE_SWAPCHAIN_IMAGE_ACQUIRE_INFO};
+            ThrowIfXrFailed(xrAcquireSwapchainImage(pointerRaySwapchain_, &acquireInfo, &rayImageIndex),
+                            "xrAcquireSwapchainImage(pointerRay)", instance_);
+
+            XrSwapchainImageWaitInfo waitInfo{XR_TYPE_SWAPCHAIN_IMAGE_WAIT_INFO};
+            waitInfo.timeout = XR_INFINITE_DURATION;
+            ThrowIfXrFailed(xrWaitSwapchainImage(pointerRaySwapchain_, &waitInfo), "xrWaitSwapchainImage(pointerRay)",
+                            instance_);
+
+            deviceContext_->CopyResource(pointerRayImages_[rayImageIndex].texture, pointerRayTexture_.Get());
+
+            XrSwapchainImageReleaseInfo releaseInfo{XR_TYPE_SWAPCHAIN_IMAGE_RELEASE_INFO};
+            ThrowIfXrFailed(xrReleaseSwapchainImage(pointerRaySwapchain_, &releaseInfo), "xrReleaseSwapchainImage(pointerRay)",
+                            instance_);
+
+            pointerRayLayer.space = appSpace_;
+            pointerRayLayer.eyeVisibility = XR_EYE_VISIBILITY_BOTH;
+            pointerRayLayer.subImage.swapchain = pointerRaySwapchain_;
+            pointerRayLayer.subImage.imageRect.offset = {0, 0};
+            pointerRayLayer.subImage.imageRect.extent = {kPointerRayTextureWidth, kPointerRayTextureHeight};
+            pointerRayLayer.subImage.imageArrayIndex = 0;
+            pointerRayLayer.pose = pointerRayPose_;
+            pointerRayLayer.size = {pointerRayLengthMeters_, kPointerRayThicknessMeters};
+
+            layers[layerCount++] = reinterpret_cast<XrCompositionLayerBaseHeader*>(&pointerRayLayer);
+        }
+
+        deviceContext_->Flush();
     }
 
     XrFrameEndInfo frameEndInfo{XR_TYPE_FRAME_END_INFO};
@@ -373,6 +478,11 @@ void FlutterXrApp::Shutdown() {
     if (quadSwapchain_ != XR_NULL_HANDLE) {
         xrDestroySwapchain(quadSwapchain_);
         quadSwapchain_ = XR_NULL_HANDLE;
+    }
+
+    if (pointerRaySwapchain_ != XR_NULL_HANDLE) {
+        xrDestroySwapchain(pointerRaySwapchain_);
+        pointerRaySwapchain_ = XR_NULL_HANDLE;
     }
 
     if (pointerSpace_ != XR_NULL_HANDLE) {
@@ -417,7 +527,9 @@ void FlutterXrApp::Shutdown() {
     deviceContext_.Reset();
     device_.Reset();
     flutterTexture_.Reset();
+    pointerRayTexture_.Reset();
     quadImages_.clear();
+    pointerRayImages_.clear();
     convertedPixels_.clear();
 }
 

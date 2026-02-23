@@ -23,6 +23,11 @@ inline constexpr float kQuadWidthMeters = 1.2f;
 inline constexpr float kQuadHeightMeters =
     kQuadWidthMeters * (static_cast<float>(kFlutterSurfaceHeight) / static_cast<float>(kFlutterSurfaceWidth));
 inline constexpr float kQuadDistanceMeters = 1.2f;
+inline constexpr int32_t kPointerRayTextureWidth = 256;
+inline constexpr int32_t kPointerRayTextureHeight = 8;
+inline constexpr float kPointerRayThicknessMeters = 0.01f;
+inline constexpr float kPointerRayFallbackLengthMeters = 2.0f;
+inline constexpr float kPointerRayMinLengthMeters = 0.05f;
 inline constexpr DWORD kFirstFrameTimeoutMs = 15000;
 inline constexpr float kTriggerPressThreshold = 0.75f;
 inline constexpr float kTriggerReleaseThreshold = 0.65f;
@@ -62,6 +67,7 @@ XrVector3f Scale(const XrVector3f& value, float scale);
 float Dot(const XrVector3f& lhs, const XrVector3f& rhs);
 XrVector3f Cross(const XrVector3f& lhs, const XrVector3f& rhs);
 XrQuaternionf Conjugate(const XrQuaternionf& value);
+XrQuaternionf Multiply(const XrQuaternionf& lhs, const XrQuaternionf& rhs);
 XrVector3f RotateVector(const XrQuaternionf& rotation, const XrVector3f& value);
 XrVector3f Normalize(const XrVector3f& value);
 
@@ -70,6 +76,7 @@ bool IntersectRayWithQuad(const XrVector3f& rayOriginWorld,
                           const XrPosef& quadPoseWorld,
                           float quadWidthMeters,
                           float quadHeightMeters,
+                          float* outHitDistanceMeters,
                           double* outU,
                           double* outV);
 
