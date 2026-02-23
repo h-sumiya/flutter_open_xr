@@ -59,3 +59,21 @@ cmake --build build --config Release --target flutter_offscreen
 `flutter_offscreen.exe` は low-level embedder (`flutter_embedder.h`) で Flutter を起動し、オフスクリーン software surface の初回フレームコールバック到達を確認します（画面表示はしません）。
 
 実行に必要な `flutter_engine.dll` / `data/flutter_assets` はビルド時に実行ファイル横へ自動配置されます。`icudtl.dat` はローカル Flutter SDK キャッシュに存在する場合のみ追加で配置します。
+
+## 手順3サンプル: `flutter_xr_step3`（統合）
+
+このターゲットは手順1/2を統合したサンプルです。
+
+- OpenXR セッションと Flutter オフスクリーン描画で **同一の `ID3D11Device`** を共有
+- Flutter の software surface コールバックで受け取った最新フレームを D3D11 テクスチャへ更新
+- 毎フレーム OpenXR の Quad スワップチェーン画像へコピーして表示
+
+```powershell
+cmake --build build --config Release --target flutter_xr_step3
+```
+
+```powershell
+.\build\bin\Release\flutter_xr_step3.exe
+```
+
+実行には OpenXR Runtime と HMD 接続が必要です。終了はコンソールで `Esc` または `Q` キーです。
