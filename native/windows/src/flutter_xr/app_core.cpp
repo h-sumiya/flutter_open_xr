@@ -5,6 +5,7 @@
 #include <algorithm>
 #include <array>
 #include <chrono>
+#include <cmath>
 #include <cstring>
 #include <exception>
 #include <iostream>
@@ -22,6 +23,21 @@ uint32_t PackColor(uint8_t r, uint8_t g, uint8_t b, uint8_t a, bool bgraFormat) 
     }
     return static_cast<uint32_t>(r) | (static_cast<uint32_t>(g) << 8U) | (static_cast<uint32_t>(b) << 16U) |
            (static_cast<uint32_t>(a) << 24U);
+}
+
+constexpr float kPi = 3.14159265358979323846f;
+constexpr uint32_t kPointerRayHandCount = 2;
+constexpr uint32_t kMaxPointerRayLayerCount = kPointerRayHandCount * kPointerRayCylinderSegmentCount;
+
+XrQuaternionf MakeXAxisRotation(float radians) {
+    const float halfAngle = radians * 0.5f;
+    return {std::sin(halfAngle), 0.0f, 0.0f, std::cos(halfAngle)};
+}
+
+float ComputePointerRaySegmentWidthMeters() {
+    const float radius = kPointerRayCylinderDiameterMeters * 0.5f;
+    const float halfSegmentAngle = kPi / static_cast<float>(kPointerRayCylinderSegmentCount);
+    return 2.0f * radius * std::tan(halfSegmentAngle);
 }
 
 }  // namespace
@@ -391,11 +407,11 @@ void FlutterXrApp::RenderFrame() {
 
     XrCompositionLayerQuad backgroundLayer{XR_TYPE_COMPOSITION_LAYER_QUAD};
     XrCompositionLayerQuad quadLayer{XR_TYPE_COMPOSITION_LAYER_QUAD};
-    std::array<XrCompositionLayerQuad, 2> pointerRayLayers = {
-        XrCompositionLayerQuad{XR_TYPE_COMPOSITION_LAYER_QUAD},
-        XrCompositionLayerQuad{XR_TYPE_COMPOSITION_LAYER_QUAD},
-    };
-    std::array<XrCompositionLayerBaseHeader*, 4> layers{};
+    std::array<XrCompositionLayerQuad, kMaxPointerRayLayerCount> pointerRayLayers{};
+    for (XrCompositionLayerQuad& pointerRayLayer : pointerRayLayers) {
+        pointerRayLayer = XrCompositionLayerQuad{XR_TYPE_COMPOSITION_LAYER_QUAD};
+    }
+    std::array<XrCompositionLayerBaseHeader*, 2 + kMaxPointerRayLayerCount> layers{};
     uint32_t layerCount = 0;
 
     if (frameState.shouldRender == XR_TRUE) {
@@ -478,24 +494,43 @@ void FlutterXrApp::RenderFrame() {
                             instance_);
 
             uint32_t pointerRayLayerCount = 0;
-            auto appendPointerRayLayer = [&](const XrPosef& pose, float lengthMeters) {
-                XrCompositionLayerQuad& pointerRayLayer = pointerRayLayers[pointerRayLayerCount++];
-                pointerRayLayer.space = appSpace_;
-                pointerRayLayer.eyeVisibility = XR_EYE_VISIBILITY_BOTH;
-                pointerRayLayer.subImage.swapchain = pointerRaySwapchain_;
-                pointerRayLayer.subImage.imageRect.offset = {0, 0};
-                pointerRayLayer.subImage.imageRect.extent = {kPointerRayTextureWidth, kPointerRayTextureHeight};
-                pointerRayLayer.subImage.imageArrayIndex = 0;
-                pointerRayLayer.pose = pose;
-                pointerRayLayer.size = {lengthMeters, kPointerRayThicknessMeters};
-                layers[layerCount++] = reinterpret_cast<XrCompositionLayerBaseHeader*>(&pointerRayLayer);
+            const float pointerRaySegmentWidthMeters = ComputePointerRaySegmentWidthMeters();
+            const float segmentStepRadians = (2.0f * kPi) / static_cast<float>(kPointerRayCylinderSegmentCount);
+            auto appendPointerRayCylinder = [&](const XrPosef& pose, float lengthMeters) {
+                if (lengthMeters <= 0.0f || pointerRaySegmentWidthMeters <= 0.0f) {
+                    return;
+                }
+
+                for (uint32_t segmentIndex = 0; segmentIndex < kPointerRayCylinderSegmentCount; ++segmentIndex) {
+                    if (pointerRayLayerCount >= pointerRayLayers.size() || layerCount >= layers.size()) {
+                        return;
+                    }
+
+                    const float angleRadians = segmentStepRadians * static_cast<float>(segmentIndex);
+                    const XrQuaternionf segmentRotation = MakeXAxisRotation(angleRadians);
+                    XrCompositionLayerQuad& pointerRayLayer = pointerRayLayers[pointerRayLayerCount++];
+
+                    pointerRayLayer.space = appSpace_;
+                    pointerRayLayer.eyeVisibility = XR_EYE_VISIBILITY_BOTH;
+                    pointerRayLayer.subImage.swapchain = pointerRaySwapchain_;
+                    pointerRayLayer.subImage.imageRect.offset = {0, 0};
+                    pointerRayLayer.subImage.imageRect.extent = {kPointerRayTextureWidth, kPointerRayTextureHeight};
+                    pointerRayLayer.subImage.imageArrayIndex = 0;
+                    pointerRayLayer.pose.orientation = Multiply(pose.orientation, segmentRotation);
+
+                    const XrVector3f radialOffsetLocal =
+                        RotateVector(segmentRotation, XrVector3f{0.0f, 0.0f, kPointerRayCylinderDiameterMeters * 0.5f});
+                    pointerRayLayer.pose.position = Add(pose.position, RotateVector(pose.orientation, radialOffsetLocal));
+                    pointerRayLayer.size = {lengthMeters, pointerRaySegmentWidthMeters};
+                    layers[layerCount++] = reinterpret_cast<XrCompositionLayerBaseHeader*>(&pointerRayLayer);
+                }
             };
 
             if (pointerRayVisible_) {
-                appendPointerRayLayer(pointerRayPose_, pointerRayLengthMeters_);
+                appendPointerRayCylinder(pointerRayPose_, pointerRayLengthMeters_);
             }
             if (leftPointerRayVisible_) {
-                appendPointerRayLayer(leftPointerRayPose_, leftPointerRayLengthMeters_);
+                appendPointerRayCylinder(leftPointerRayPose_, leftPointerRayLengthMeters_);
             }
         }
 
