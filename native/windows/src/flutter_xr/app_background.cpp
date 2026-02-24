@@ -50,9 +50,9 @@ bool BuildGroundGridPixels(bool bgraFormat, std::vector<uint32_t>* outPixels) {
     const size_t height = static_cast<size_t>(kBackgroundTextureHeight);
     outPixels->assign(width * height, 0);
 
-    constexpr int kMajorCell = 128;
-    constexpr int kMinorCell = 32;
-    constexpr int kMajorThickness = 3;
+    constexpr int kMajorCell = 30;
+    constexpr int kMinorCell = 6;
+    constexpr int kMajorThickness = 1;
     constexpr int kMinorThickness = 1;
 
     for (size_t y = 0; y < height; ++y) {
@@ -65,23 +65,15 @@ bool BuildGroundGridPixels(bool bgraFormat, std::vector<uint32_t>* outPixels) {
             const float u = (static_cast<float>(x) / static_cast<float>(width - 1)) * 2.0f - 1.0f;
             const float v = (static_cast<float>(y) / static_cast<float>(height - 1)) * 2.0f - 1.0f;
             const float radial = std::sqrt(u * u + v * v);
-            const float fade = std::clamp(1.2f - radial, 0.35f, 1.0f);
+            const float fade = std::clamp(1.2f - radial, 0.0f, 1.0f);
 
-            uint8_t r = static_cast<uint8_t>(24.0f * fade);
-            uint8_t g = static_cast<uint8_t>(30.0f * fade);
-            uint8_t b = static_cast<uint8_t>(38.0f * fade);
-            if (minorLine) {
-                r = static_cast<uint8_t>(56.0f * fade);
-                g = static_cast<uint8_t>(72.0f * fade);
-                b = static_cast<uint8_t>(90.0f * fade);
-            }
-            if (majorLine) {
-                r = static_cast<uint8_t>(95.0f * fade);
-                g = static_cast<uint8_t>(140.0f * fade);
-                b = static_cast<uint8_t>(175.0f * fade);
+            uint8_t shade = static_cast<uint8_t>(6.0f * fade);
+            if (minorLine || majorLine) {
+                shade = minorLine ? static_cast<uint8_t>(220.0f * fade) : shade;
+                shade = majorLine ? static_cast<uint8_t>(255.0f * fade) : shade;
             }
 
-            (*outPixels)[y * width + x] = PackColor(r, g, b, 255, bgraFormat);
+            (*outPixels)[y * width + x] = PackColor(shade, shade, shade, 255, bgraFormat);
         }
     }
 

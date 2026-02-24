@@ -1,6 +1,7 @@
 #include "flutter_xr/app.h"
 
 #include <algorithm>
+#include <array>
 #include <cstring>
 #include <iostream>
 
@@ -30,14 +31,17 @@ void FlutterXrApp::InitializeInputActions() {
 
     ThrowIfXrFailed(xrStringToPath(instance_, "/user/hand/right", &rightHandPath_), "xrStringToPath(/user/hand/right)",
                     instance_);
+    ThrowIfXrFailed(xrStringToPath(instance_, "/user/hand/left", &leftHandPath_), "xrStringToPath(/user/hand/left)",
+                    instance_);
 
     {
         XrActionCreateInfo actionInfo{XR_TYPE_ACTION_CREATE_INFO};
         actionInfo.actionType = XR_ACTION_TYPE_POSE_INPUT;
         std::strcpy(actionInfo.actionName, "pointer_pose");
         std::strcpy(actionInfo.localizedActionName, "Pointer Pose");
-        actionInfo.countSubactionPaths = 1;
-        actionInfo.subactionPaths = &rightHandPath_;
+        const std::array<XrPath, 2> handSubactionPaths = {leftHandPath_, rightHandPath_};
+        actionInfo.countSubactionPaths = static_cast<uint32_t>(handSubactionPaths.size());
+        actionInfo.subactionPaths = handSubactionPaths.data();
         ThrowIfXrFailed(xrCreateAction(inputActionSet_, &actionInfo, &pointerPoseAction_), "xrCreateAction(pointerPose)",
                         instance_);
     }
@@ -56,7 +60,9 @@ void FlutterXrApp::InitializeInputActions() {
     XrPath rightSelectClickPath = XR_NULL_PATH;
     XrPath rightTriggerValuePath = XR_NULL_PATH;
     XrPath rightAimPosePath = XR_NULL_PATH;
+    XrPath leftAimPosePath = XR_NULL_PATH;
     XrPath rightGripPosePath = XR_NULL_PATH;
+    XrPath leftGripPosePath = XR_NULL_PATH;
 
     ThrowIfXrFailed(xrStringToPath(instance_, "/user/hand/right/input/select/click", &rightSelectClickPath),
                     "xrStringToPath(right select click)", instance_);
@@ -64,8 +70,12 @@ void FlutterXrApp::InitializeInputActions() {
                     "xrStringToPath(right trigger value)", instance_);
     ThrowIfXrFailed(xrStringToPath(instance_, "/user/hand/right/input/aim/pose", &rightAimPosePath),
                     "xrStringToPath(right aim pose)", instance_);
+    ThrowIfXrFailed(xrStringToPath(instance_, "/user/hand/left/input/aim/pose", &leftAimPosePath),
+                    "xrStringToPath(left aim pose)", instance_);
     ThrowIfXrFailed(xrStringToPath(instance_, "/user/hand/right/input/grip/pose", &rightGripPosePath),
                     "xrStringToPath(right grip pose)", instance_);
+    ThrowIfXrFailed(xrStringToPath(instance_, "/user/hand/left/input/grip/pose", &leftGripPosePath),
+                    "xrStringToPath(left grip pose)", instance_);
 
     XrPath khrSimpleInteractionProfile = XR_NULL_PATH;
     XrPath oculusTouchInteractionProfile = XR_NULL_PATH;
@@ -85,12 +95,26 @@ void FlutterXrApp::InitializeInputActions() {
                                    &microsoftMotionInteractionProfile),
                     "xrStringToPath(microsoft motion profile)", instance_);
 
-    SuggestBindings(khrSimpleInteractionProfile, {{triggerValueAction_, rightSelectClickPath}, {pointerPoseAction_, rightGripPosePath}});
-    SuggestBindings(oculusTouchInteractionProfile, {{triggerValueAction_, rightTriggerValuePath}, {pointerPoseAction_, rightAimPosePath}});
-    SuggestBindings(viveInteractionProfile, {{triggerValueAction_, rightTriggerValuePath}, {pointerPoseAction_, rightGripPosePath}});
-    SuggestBindings(indexInteractionProfile, {{triggerValueAction_, rightTriggerValuePath}, {pointerPoseAction_, rightGripPosePath}});
+    SuggestBindings(khrSimpleInteractionProfile,
+                    {{triggerValueAction_, rightSelectClickPath},
+                     {pointerPoseAction_, rightGripPosePath},
+                     {pointerPoseAction_, leftGripPosePath}});
+    SuggestBindings(oculusTouchInteractionProfile,
+                    {{triggerValueAction_, rightTriggerValuePath},
+                     {pointerPoseAction_, rightAimPosePath},
+                     {pointerPoseAction_, leftAimPosePath}});
+    SuggestBindings(viveInteractionProfile,
+                    {{triggerValueAction_, rightTriggerValuePath},
+                     {pointerPoseAction_, rightGripPosePath},
+                     {pointerPoseAction_, leftGripPosePath}});
+    SuggestBindings(indexInteractionProfile,
+                    {{triggerValueAction_, rightTriggerValuePath},
+                     {pointerPoseAction_, rightGripPosePath},
+                     {pointerPoseAction_, leftGripPosePath}});
     SuggestBindings(microsoftMotionInteractionProfile,
-                    {{triggerValueAction_, rightTriggerValuePath}, {pointerPoseAction_, rightGripPosePath}});
+                    {{triggerValueAction_, rightTriggerValuePath},
+                     {pointerPoseAction_, rightGripPosePath},
+                     {pointerPoseAction_, leftGripPosePath}});
 
     XrSessionActionSetsAttachInfo attachInfo{XR_TYPE_SESSION_ACTION_SETS_ATTACH_INFO};
     attachInfo.countActionSets = 1;
@@ -103,17 +127,21 @@ void FlutterXrApp::InitializeInputActions() {
     actionSpaceInfo.poseInActionSpace.orientation.w = 1.0f;
     ThrowIfXrFailed(xrCreateActionSpace(session_, &actionSpaceInfo, &pointerSpace_), "xrCreateActionSpace(pointer)",
                     instance_);
+
+    actionSpaceInfo.subactionPath = leftHandPath_;
+    ThrowIfXrFailed(xrCreateActionSpace(session_, &actionSpaceInfo, &leftPointerSpace_),
+                    "xrCreateActionSpace(pointerLeft)", instance_);
 }
 
-PointerHitResult FlutterXrApp::QueryPointerHit(XrTime predictedDisplayTime) {
+PointerHitResult FlutterXrApp::QueryPointerHit(XrTime predictedDisplayTime, XrSpace pointerSpace, XrPath handPath) {
     PointerHitResult result;
-    if (pointerSpace_ == XR_NULL_HANDLE) {
+    if (pointerSpace == XR_NULL_HANDLE || handPath == XR_NULL_PATH) {
         return result;
     }
 
     XrActionStateGetInfo poseGetInfo{XR_TYPE_ACTION_STATE_GET_INFO};
     poseGetInfo.action = pointerPoseAction_;
-    poseGetInfo.subactionPath = rightHandPath_;
+    poseGetInfo.subactionPath = handPath;
     XrActionStatePose poseState{XR_TYPE_ACTION_STATE_POSE};
     ThrowIfXrFailed(xrGetActionStatePose(session_, &poseGetInfo, &poseState), "xrGetActionStatePose(pointerPose)",
                     instance_);
@@ -122,7 +150,7 @@ PointerHitResult FlutterXrApp::QueryPointerHit(XrTime predictedDisplayTime) {
     }
 
     XrSpaceLocation pointerLocation{XR_TYPE_SPACE_LOCATION};
-    const XrResult locateResult = xrLocateSpace(pointerSpace_, appSpace_, predictedDisplayTime, &pointerLocation);
+    const XrResult locateResult = xrLocateSpace(pointerSpace, appSpace_, predictedDisplayTime, &pointerLocation);
     if (XR_FAILED(locateResult)) {
         return result;
     }
@@ -205,6 +233,7 @@ void FlutterXrApp::PollInput(XrTime predictedDisplayTime) {
         }
         triggerPressed_ = false;
         pointerRayVisible_ = false;
+        leftPointerRayVisible_ = false;
         return;
     }
 
@@ -214,18 +243,26 @@ void FlutterXrApp::PollInput(XrTime predictedDisplayTime) {
     syncInfo.activeActionSets = &activeActionSet;
     ThrowIfXrFailed(xrSyncActions(session_, &syncInfo), "xrSyncActions", instance_);
 
-    const PointerHitResult hit = QueryPointerHit(predictedDisplayTime);
-    if (hit.hasPose) {
-        const float rayLength = hit.onQuad
-                                    ? std::clamp(hit.hitDistanceMeters, kPointerRayMinLengthMeters, kPointerRayFallbackLengthMeters)
-                                    : kPointerRayFallbackLengthMeters;
-        pointerRayLengthMeters_ = rayLength;
-        pointerRayPose_.orientation = Multiply(hit.pointerOrientation, kRayAlignmentFromController);
-        pointerRayPose_.position = Add(hit.rayOriginWorld, Scale(hit.rayDirectionWorld, rayLength * 0.5f));
-        pointerRayVisible_ = true;
-    } else {
-        pointerRayVisible_ = false;
-    }
+    const PointerHitResult hit = QueryPointerHit(predictedDisplayTime, pointerSpace_, rightHandPath_);
+    const PointerHitResult leftHit = QueryPointerHit(predictedDisplayTime, leftPointerSpace_, leftHandPath_);
+
+    auto updateRayState = [&](const PointerHitResult& pointerHit, bool* visible, float* length, XrPosef* pose) {
+        if (pointerHit.hasPose) {
+            const float rayLength =
+                pointerHit.onQuad
+                    ? std::clamp(pointerHit.hitDistanceMeters, kPointerRayMinLengthMeters, kPointerRayFallbackLengthMeters)
+                    : kPointerRayFallbackLengthMeters;
+            *length = rayLength;
+            pose->orientation = Multiply(pointerHit.pointerOrientation, kRayAlignmentFromController);
+            pose->position = Add(pointerHit.rayOriginWorld, Scale(pointerHit.rayDirectionWorld, rayLength * 0.5f));
+            *visible = true;
+            return;
+        }
+        *visible = false;
+    };
+
+    updateRayState(hit, &pointerRayVisible_, &pointerRayLengthMeters_, &pointerRayPose_);
+    updateRayState(leftHit, &leftPointerRayVisible_, &leftPointerRayLengthMeters_, &leftPointerRayPose_);
 
     XrActionStateGetInfo triggerGetInfo{XR_TYPE_ACTION_STATE_GET_INFO};
     triggerGetInfo.action = triggerValueAction_;

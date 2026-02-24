@@ -64,7 +64,7 @@ class FlutterXrApp {
 
     void SuggestBindings(XrPath interactionProfile, const std::vector<XrActionSuggestedBinding>& bindings);
     void InitializeInputActions();
-    PointerHitResult QueryPointerHit(XrTime predictedDisplayTime);
+    PointerHitResult QueryPointerHit(XrTime predictedDisplayTime, XrSpace pointerSpace, XrPath handPath);
     bool SendFlutterPointerEvent(FlutterPointerPhase phase, double xPixels, double yPixels, int64_t buttons);
     void EnsureFlutterPointerAdded(double xPixels, double yPixels);
     void PollInput(XrTime predictedDisplayTime);
@@ -92,6 +92,7 @@ class FlutterXrApp {
     XrSession session_{XR_NULL_HANDLE};
     XrSpace appSpace_{XR_NULL_HANDLE};
     XrSpace pointerSpace_{XR_NULL_HANDLE};
+    XrSpace leftPointerSpace_{XR_NULL_HANDLE};
     XrSwapchain quadSwapchain_{XR_NULL_HANDLE};
     XrSwapchain backgroundSwapchain_{XR_NULL_HANDLE};
     XrSwapchain pointerRaySwapchain_{XR_NULL_HANDLE};
@@ -99,6 +100,7 @@ class FlutterXrApp {
     XrAction pointerPoseAction_{XR_NULL_HANDLE};
     XrAction triggerValueAction_{XR_NULL_HANDLE};
     XrPath rightHandPath_{XR_NULL_PATH};
+    XrPath leftHandPath_{XR_NULL_PATH};
 
     XrViewConfigurationType viewConfigType_{XR_VIEW_CONFIGURATION_TYPE_PRIMARY_STEREO};
     XrEnvironmentBlendMode blendMode_{XR_ENVIRONMENT_BLEND_MODE_OPAQUE};
@@ -110,8 +112,11 @@ class FlutterXrApp {
     bool pointerAdded_{false};
     bool pointerDown_{false};
     bool pointerRayVisible_{false};
+    bool leftPointerRayVisible_{false};
     float pointerRayLengthMeters_{0.0f};
+    float leftPointerRayLengthMeters_{0.0f};
     XrPosef pointerRayPose_{};
+    XrPosef leftPointerRayPose_{};
     double lastPointerX_{static_cast<double>(kFlutterSurfaceWidth) * 0.5};
     double lastPointerY_{static_cast<double>(kFlutterSurfaceHeight) * 0.5};
 

@@ -43,6 +43,9 @@ void FlutterXrApp::Initialize() {
     pointerRayPose_.orientation = {0.0f, 0.0f, 0.0f, 1.0f};
     pointerRayPose_.position = {0.0f, 0.0f, 0.0f};
     pointerRayLengthMeters_ = kPointerRayFallbackLengthMeters;
+    leftPointerRayPose_.orientation = {0.0f, 0.0f, 0.0f, 1.0f};
+    leftPointerRayPose_.position = {0.0f, 0.0f, 0.0f};
+    leftPointerRayLengthMeters_ = kPointerRayFallbackLengthMeters;
     InitializeInputActions();
     CreateQuadSwapchain();
     CreateBackgroundSwapchain();
@@ -354,6 +357,7 @@ void FlutterXrApp::HandleSessionStateChanged(const XrEventDataSessionStateChange
             }
             triggerPressed_ = false;
             pointerRayVisible_ = false;
+            leftPointerRayVisible_ = false;
             sessionRunning_ = false;
             ThrowIfXrFailed(xrEndSession(session_), "xrEndSession", instance_);
             std::cout << "Session stopping.\n";
@@ -366,6 +370,7 @@ void FlutterXrApp::HandleSessionStateChanged(const XrEventDataSessionStateChange
             }
             triggerPressed_ = false;
             pointerRayVisible_ = false;
+            leftPointerRayVisible_ = false;
             sessionRunning_ = false;
             exitRequested_ = true;
             break;
@@ -386,8 +391,11 @@ void FlutterXrApp::RenderFrame() {
 
     XrCompositionLayerQuad backgroundLayer{XR_TYPE_COMPOSITION_LAYER_QUAD};
     XrCompositionLayerQuad quadLayer{XR_TYPE_COMPOSITION_LAYER_QUAD};
-    XrCompositionLayerQuad pointerRayLayer{XR_TYPE_COMPOSITION_LAYER_QUAD};
-    std::array<XrCompositionLayerBaseHeader*, 3> layers{};
+    std::array<XrCompositionLayerQuad, 2> pointerRayLayers = {
+        XrCompositionLayerQuad{XR_TYPE_COMPOSITION_LAYER_QUAD},
+        XrCompositionLayerQuad{XR_TYPE_COMPOSITION_LAYER_QUAD},
+    };
+    std::array<XrCompositionLayerBaseHeader*, 4> layers{};
     uint32_t layerCount = 0;
 
     if (frameState.shouldRender == XR_TRUE) {
@@ -449,7 +457,10 @@ void FlutterXrApp::RenderFrame() {
 
         layers[layerCount++] = reinterpret_cast<XrCompositionLayerBaseHeader*>(&quadLayer);
 
-        if (pointerRayVisible_ && pointerRaySwapchain_ != XR_NULL_HANDLE && pointerRayTexture_ != nullptr) {
+        const bool hasAnyPointerRay =
+            (pointerRayVisible_ || leftPointerRayVisible_) && pointerRaySwapchain_ != XR_NULL_HANDLE &&
+            pointerRayTexture_ != nullptr;
+        if (hasAnyPointerRay) {
             uint32_t rayImageIndex = 0;
             XrSwapchainImageAcquireInfo acquireInfo{XR_TYPE_SWAPCHAIN_IMAGE_ACQUIRE_INFO};
             ThrowIfXrFailed(xrAcquireSwapchainImage(pointerRaySwapchain_, &acquireInfo, &rayImageIndex),
@@ -466,16 +477,26 @@ void FlutterXrApp::RenderFrame() {
             ThrowIfXrFailed(xrReleaseSwapchainImage(pointerRaySwapchain_, &releaseInfo), "xrReleaseSwapchainImage(pointerRay)",
                             instance_);
 
-            pointerRayLayer.space = appSpace_;
-            pointerRayLayer.eyeVisibility = XR_EYE_VISIBILITY_BOTH;
-            pointerRayLayer.subImage.swapchain = pointerRaySwapchain_;
-            pointerRayLayer.subImage.imageRect.offset = {0, 0};
-            pointerRayLayer.subImage.imageRect.extent = {kPointerRayTextureWidth, kPointerRayTextureHeight};
-            pointerRayLayer.subImage.imageArrayIndex = 0;
-            pointerRayLayer.pose = pointerRayPose_;
-            pointerRayLayer.size = {pointerRayLengthMeters_, kPointerRayThicknessMeters};
+            uint32_t pointerRayLayerCount = 0;
+            auto appendPointerRayLayer = [&](const XrPosef& pose, float lengthMeters) {
+                XrCompositionLayerQuad& pointerRayLayer = pointerRayLayers[pointerRayLayerCount++];
+                pointerRayLayer.space = appSpace_;
+                pointerRayLayer.eyeVisibility = XR_EYE_VISIBILITY_BOTH;
+                pointerRayLayer.subImage.swapchain = pointerRaySwapchain_;
+                pointerRayLayer.subImage.imageRect.offset = {0, 0};
+                pointerRayLayer.subImage.imageRect.extent = {kPointerRayTextureWidth, kPointerRayTextureHeight};
+                pointerRayLayer.subImage.imageArrayIndex = 0;
+                pointerRayLayer.pose = pose;
+                pointerRayLayer.size = {lengthMeters, kPointerRayThicknessMeters};
+                layers[layerCount++] = reinterpret_cast<XrCompositionLayerBaseHeader*>(&pointerRayLayer);
+            };
 
-            layers[layerCount++] = reinterpret_cast<XrCompositionLayerBaseHeader*>(&pointerRayLayer);
+            if (pointerRayVisible_) {
+                appendPointerRayLayer(pointerRayPose_, pointerRayLengthMeters_);
+            }
+            if (leftPointerRayVisible_) {
+                appendPointerRayLayer(leftPointerRayPose_, leftPointerRayLengthMeters_);
+            }
         }
 
         deviceContext_->Flush();
@@ -526,6 +547,11 @@ void FlutterXrApp::Shutdown() {
     if (pointerSpace_ != XR_NULL_HANDLE) {
         xrDestroySpace(pointerSpace_);
         pointerSpace_ = XR_NULL_HANDLE;
+    }
+
+    if (leftPointerSpace_ != XR_NULL_HANDLE) {
+        xrDestroySpace(leftPointerSpace_);
+        leftPointerSpace_ = XR_NULL_HANDLE;
     }
 
     if (appSpace_ != XR_NULL_HANDLE) {
