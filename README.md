@@ -14,11 +14,10 @@ Build Flutter UI into a Windows OpenXR runtime host with one command.
 
 ## Why this project
 
-`flutter_open_xr` is a CLI package for teams that want to:
+`flutter_open_xr` provides:
 
-- Keep Flutter as the app UI layer.
-- Run inside a native Windows OpenXR host.
-- Reproduce builds from a predictable, scripted pipeline.
+- A reproducible build CLI for Windows OpenXR host output.
+- A Flutter-side background control channel for the OpenXR runtime.
 
 ## What the build command does
 
@@ -33,13 +32,13 @@ Build Flutter UI into a Windows OpenXR runtime host with one command.
 ## Install
 
 ```powershell
-flutter pub add --dev flutter_open_xr
+flutter pub add flutter_open_xr
 ```
 
 Or in `pubspec.yaml`:
 
 ```yaml
-dev_dependencies:
+dependencies:
   flutter_open_xr: ^0.1.1
 ```
 
@@ -62,6 +61,28 @@ Dry-run to verify commands without executing:
 ```powershell
 dart run flutter_open_xr build --dry-run
 ```
+
+## Runtime background control
+
+Import the runtime API from Flutter:
+
+```dart
+import "package:flutter_open_xr/background.dart";
+```
+
+Supported commands:
+
+- `XrBackgroundController.setNone()`
+- `XrBackgroundController.setGroundGrid()` (default mode)
+- `XrBackgroundController.setDdsFile(path)` (`.dds` only)
+- `XrBackgroundController.setGlbFile(path)` (currently returns "not supported yet")
+
+Background command format between Flutter and host is stable and text-based:
+
+- `none`
+- `grid`
+- `dds|<path>`
+- `glb|<path>`
 
 ## Build options
 
@@ -104,7 +125,7 @@ This repository includes a sample app in `example/`.
 It uses a local path dependency:
 
 ```yaml
-dev_dependencies:
+dependencies:
   flutter_open_xr:
     path: ..
 ```

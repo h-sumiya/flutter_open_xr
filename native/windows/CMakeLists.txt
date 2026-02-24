@@ -56,6 +56,7 @@ add_library(
     src/flutter_xr/app_core.cpp
     src/flutter_xr/app_input.cpp
     src/flutter_xr/app_flutter.cpp
+    src/flutter_xr/app_background.cpp
 )
 
 target_include_directories(
@@ -82,6 +83,7 @@ target_link_libraries(
     d3d11
     dxgi
     ole32
+    windowscodecs
     "${FLUTTER_ENGINE_IMPORT_LIB}"
 )
 

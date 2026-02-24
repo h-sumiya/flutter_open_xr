@@ -9,28 +9,22 @@ namespace flutter_xr {
 
 namespace {
 
+constexpr const char* kBackgroundChannel = "flutter_open_xr/background";
+
 bool OnSurfacePresent(void* user_data, const void* allocation, size_t row_bytes, size_t height) {
-    if (user_data == nullptr || allocation == nullptr || row_bytes < 4 || height == 0) {
+    auto* app = static_cast<FlutterXrApp*>(user_data);
+    if (app == nullptr) {
         return false;
     }
+    return app->HandleFlutterSurfacePresent(allocation, row_bytes, height);
+}
 
-    auto* bridge = static_cast<FlutterBridgeState*>(user_data);
-    const size_t frameBytes = row_bytes * height;
-
-    {
-        std::lock_guard<std::mutex> lock(bridge->latestFrame.mutex);
-        bridge->latestFrame.pixels.resize(frameBytes);
-        std::memcpy(bridge->latestFrame.pixels.data(), allocation, frameBytes);
-        bridge->latestFrame.rowBytes = row_bytes;
-        bridge->latestFrame.width = row_bytes / 4;
-        bridge->latestFrame.height = height;
-        bridge->latestFrame.frameIndex += 1;
+void OnPlatformMessage(const FlutterPlatformMessage* message, void* user_data) {
+    auto* app = static_cast<FlutterXrApp*>(user_data);
+    if (app == nullptr) {
+        return;
     }
-
-    if (bridge->firstFrameEvent != nullptr) {
-        SetEvent(bridge->firstFrameEvent);
-    }
-    return true;
+    app->HandleFlutterPlatformMessage(message);
 }
 
 }  // namespace
@@ -69,9 +63,10 @@ void FlutterXrApp::InitializeFlutterEngine() {
     projectArgs.icu_data_path = icuPathUtf8_.empty() ? nullptr : icuPathUtf8_.c_str();
     projectArgs.command_line_argc = static_cast<int>(std::size(commandLineArgs));
     projectArgs.command_line_argv = commandLineArgs;
+    projectArgs.platform_message_callback = OnPlatformMessage;
 
     const FlutterEngineResult runResult =
-        FlutterEngineRun(FLUTTER_ENGINE_VERSION, &rendererConfig, &projectArgs, &flutterBridge_, &flutterEngine_);
+        FlutterEngineRun(FLUTTER_ENGINE_VERSION, &rendererConfig, &projectArgs, this, &flutterEngine_);
     if (runResult != kSuccess || flutterEngine_ == nullptr) {
         throw std::runtime_error("FlutterEngineRun failed. result=" + std::to_string(static_cast<int32_t>(runResult)));
     }
@@ -99,6 +94,56 @@ void FlutterXrApp::InitializeFlutterEngine() {
     } else {
         throw std::runtime_error("WaitForSingleObject(firstFrameEvent) failed.");
     }
+}
+
+bool FlutterXrApp::HandleFlutterSurfacePresent(const void* allocation, size_t rowBytes, size_t height) {
+    if (allocation == nullptr || rowBytes < 4 || height == 0) {
+        return false;
+    }
+
+    const size_t frameBytes = rowBytes * height;
+    {
+        std::lock_guard<std::mutex> lock(flutterBridge_.latestFrame.mutex);
+        flutterBridge_.latestFrame.pixels.resize(frameBytes);
+        std::memcpy(flutterBridge_.latestFrame.pixels.data(), allocation, frameBytes);
+        flutterBridge_.latestFrame.rowBytes = rowBytes;
+        flutterBridge_.latestFrame.width = rowBytes / 4;
+        flutterBridge_.latestFrame.height = height;
+        flutterBridge_.latestFrame.frameIndex += 1;
+    }
+
+    if (flutterBridge_.firstFrameEvent != nullptr) {
+        SetEvent(flutterBridge_.firstFrameEvent);
+    }
+    return true;
+}
+
+void FlutterXrApp::HandleFlutterPlatformMessage(const FlutterPlatformMessage* message) {
+    if (message == nullptr || message->response_handle == nullptr || flutterEngine_ == nullptr) {
+        return;
+    }
+
+    auto sendResponse = [&](const std::string& responseText) {
+        const auto* bytes = reinterpret_cast<const uint8_t*>(responseText.data());
+        const FlutterEngineResult responseResult =
+            FlutterEngineSendPlatformMessageResponse(flutterEngine_, message->response_handle, bytes, responseText.size());
+        if (responseResult != kSuccess) {
+            std::cerr << "[warn] FlutterEngineSendPlatformMessageResponse failed. result="
+                      << static_cast<int32_t>(responseResult) << "\n";
+        }
+    };
+
+    if (message->channel == nullptr || std::strcmp(message->channel, kBackgroundChannel) != 0) {
+        sendResponse(std::string());
+        return;
+    }
+
+    std::string command;
+    if (message->message != nullptr && message->message_size > 0) {
+        command.assign(reinterpret_cast<const char*>(message->message), message->message_size);
+    }
+
+    sendResponse(HandleBackgroundMessage(command));
 }
 
 bool FlutterXrApp::UploadLatestFlutterFrame() {

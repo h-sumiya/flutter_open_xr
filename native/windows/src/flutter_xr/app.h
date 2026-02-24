@@ -45,8 +45,17 @@ class FlutterXrApp {
 
     void Initialize();
     void Run();
+    bool HandleFlutterSurfacePresent(const void* allocation, size_t rowBytes, size_t height);
+    void HandleFlutterPlatformMessage(const FlutterPlatformMessage* message);
 
    private:
+    enum class BackgroundMode : uint8_t {
+        None,
+        GroundGrid,
+        Dds,
+        Glb,
+    };
+
     void CreateInstance();
     void InitializeSystem();
     void InitializeD3D11Device();
@@ -61,12 +70,17 @@ class FlutterXrApp {
     void PollInput(XrTime predictedDisplayTime);
 
     void CreateQuadSwapchain();
+    void CreateBackgroundSwapchain();
     void CreatePointerRaySwapchain();
     void CreateFlutterTexture();
+    void CreateBackgroundTexture();
     void CreatePointerRayTexture();
 
     void InitializeFlutterEngine();
     bool UploadLatestFlutterFrame();
+    bool IsBackgroundEnabled();
+    bool UploadBackgroundTexture();
+    std::string HandleBackgroundMessage(const std::string& message);
 
     void PollEvents();
     void HandleSessionStateChanged(const XrEventDataSessionStateChanged& changed);
@@ -79,6 +93,7 @@ class FlutterXrApp {
     XrSpace appSpace_{XR_NULL_HANDLE};
     XrSpace pointerSpace_{XR_NULL_HANDLE};
     XrSwapchain quadSwapchain_{XR_NULL_HANDLE};
+    XrSwapchain backgroundSwapchain_{XR_NULL_HANDLE};
     XrSwapchain pointerRaySwapchain_{XR_NULL_HANDLE};
     XrActionSet inputActionSet_{XR_NULL_HANDLE};
     XrAction pointerPoseAction_{XR_NULL_HANDLE};
@@ -106,9 +121,17 @@ class FlutterXrApp {
     bool isBgraFormat_{false};
 
     std::vector<XrSwapchainImageD3D11KHR> quadImages_;
+    std::vector<XrSwapchainImageD3D11KHR> backgroundImages_;
     std::vector<XrSwapchainImageD3D11KHR> pointerRayImages_;
     ComPtr<ID3D11Texture2D> flutterTexture_;
+    ComPtr<ID3D11Texture2D> backgroundTexture_;
     ComPtr<ID3D11Texture2D> pointerRayTexture_;
+    std::mutex backgroundMutex_;
+    BackgroundMode backgroundMode_{BackgroundMode::GroundGrid};
+    std::string backgroundAssetPathUtf8_;
+    std::vector<uint32_t> backgroundCustomPixels_;
+    uint64_t backgroundConfigVersion_{1};
+    uint64_t backgroundUploadedVersion_{0};
     FlutterEngine flutterEngine_{nullptr};
     FlutterBridgeState flutterBridge_;
     uint64_t uploadedFrameIndex_{0};

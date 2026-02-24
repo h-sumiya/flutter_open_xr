@@ -182,6 +182,20 @@ std::string WideToUtf8(const std::wstring& wide) {
     return out;
 }
 
+std::wstring Utf8ToWide(const std::string& utf8) {
+    if (utf8.empty()) {
+        return std::wstring();
+    }
+    const int needed = MultiByteToWideChar(CP_UTF8, 0, utf8.c_str(), -1, nullptr, 0);
+    if (needed <= 0) {
+        return std::wstring();
+    }
+
+    std::wstring out(static_cast<size_t>(needed - 1), L'\0');
+    MultiByteToWideChar(CP_UTF8, 0, utf8.c_str(), -1, out.data(), needed - 1);
+    return out;
+}
+
 XrVector3f Add(const XrVector3f& lhs, const XrVector3f& rhs) {
     return {lhs.x + rhs.x, lhs.y + rhs.y, lhs.z + rhs.z};
 }
@@ -303,6 +317,13 @@ XrPosef MakeQuadPose() {
     XrPosef pose{};
     pose.orientation = {0.0f, 0.0f, 0.0f, 1.0f};
     pose.position = {0.0f, 0.0f, -kQuadDistanceMeters};
+    return pose;
+}
+
+XrPosef MakeGroundPose() {
+    XrPosef pose{};
+    pose.orientation = {-0.70710677f, 0.0f, 0.0f, 0.70710677f};
+    pose.position = {0.0f, kGroundHeightMeters, kGroundForwardMeters};
     return pose;
 }
 

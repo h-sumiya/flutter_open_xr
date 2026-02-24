@@ -33,13 +33,13 @@ Flutter UIを、1コマンドでWindows向けOpenXRランタイムホストと�
 ## インストール
 
 ```powershell
-flutter pub add --dev flutter_open_xr
+flutter pub add flutter_open_xr
 ```
 
 または`pubspec.yaml`へ直接追加:
 
 ```yaml
-dev_dependencies:
+dependencies:
   flutter_open_xr: ^0.1.1
 ```
 
@@ -62,6 +62,19 @@ dart run flutter_open_xr build --help
 ```powershell
 dart run flutter_open_xr build --dry-run
 ```
+
+## Runtime background control
+
+Flutter側から背景を切り替えるには `package:flutter_open_xr/background.dart` を利用します。
+
+```dart
+import "package:flutter_open_xr/background.dart";
+```
+
+- `XrBackgroundController.setNone()`
+- `XrBackgroundController.setGroundGrid()` (default)
+- `XrBackgroundController.setDdsFile(path)` (`.dds`)
+- `XrBackgroundController.setGlbFile(path)` (現在は未対応エラー)
 
 ## ビルドオプション
 
@@ -104,7 +117,7 @@ flutter_open_xr_runner.exe
 ローカルパス依存で`flutter_open_xr`を参照します。
 
 ```yaml
-dev_dependencies:
+dependencies:
   flutter_open_xr:
     path: ..
 ```

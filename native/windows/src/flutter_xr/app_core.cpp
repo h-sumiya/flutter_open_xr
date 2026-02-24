@@ -45,8 +45,10 @@ void FlutterXrApp::Initialize() {
     pointerRayLengthMeters_ = kPointerRayFallbackLengthMeters;
     InitializeInputActions();
     CreateQuadSwapchain();
+    CreateBackgroundSwapchain();
     CreatePointerRaySwapchain();
     CreateFlutterTexture();
+    CreateBackgroundTexture();
     CreatePointerRayTexture();
     InitializeFlutterEngine();
 }
@@ -382,12 +384,43 @@ void FlutterXrApp::RenderFrame() {
     XrFrameBeginInfo frameBeginInfo{XR_TYPE_FRAME_BEGIN_INFO};
     ThrowIfXrFailed(xrBeginFrame(session_, &frameBeginInfo), "xrBeginFrame", instance_);
 
+    XrCompositionLayerQuad backgroundLayer{XR_TYPE_COMPOSITION_LAYER_QUAD};
     XrCompositionLayerQuad quadLayer{XR_TYPE_COMPOSITION_LAYER_QUAD};
     XrCompositionLayerQuad pointerRayLayer{XR_TYPE_COMPOSITION_LAYER_QUAD};
-    std::array<XrCompositionLayerBaseHeader*, 2> layers{};
+    std::array<XrCompositionLayerBaseHeader*, 3> layers{};
     uint32_t layerCount = 0;
 
     if (frameState.shouldRender == XR_TRUE) {
+        if (IsBackgroundEnabled() && backgroundSwapchain_ != XR_NULL_HANDLE && backgroundTexture_ != nullptr) {
+            uint32_t imageIndex = 0;
+            XrSwapchainImageAcquireInfo acquireInfo{XR_TYPE_SWAPCHAIN_IMAGE_ACQUIRE_INFO};
+            ThrowIfXrFailed(xrAcquireSwapchainImage(backgroundSwapchain_, &acquireInfo, &imageIndex),
+                            "xrAcquireSwapchainImage(background)", instance_);
+
+            XrSwapchainImageWaitInfo waitInfo{XR_TYPE_SWAPCHAIN_IMAGE_WAIT_INFO};
+            waitInfo.timeout = XR_INFINITE_DURATION;
+            ThrowIfXrFailed(xrWaitSwapchainImage(backgroundSwapchain_, &waitInfo), "xrWaitSwapchainImage(background)",
+                            instance_);
+
+            UploadBackgroundTexture();
+            deviceContext_->CopyResource(backgroundImages_[imageIndex].texture, backgroundTexture_.Get());
+
+            XrSwapchainImageReleaseInfo releaseInfo{XR_TYPE_SWAPCHAIN_IMAGE_RELEASE_INFO};
+            ThrowIfXrFailed(xrReleaseSwapchainImage(backgroundSwapchain_, &releaseInfo), "xrReleaseSwapchainImage(background)",
+                            instance_);
+
+            backgroundLayer.space = appSpace_;
+            backgroundLayer.eyeVisibility = XR_EYE_VISIBILITY_BOTH;
+            backgroundLayer.subImage.swapchain = backgroundSwapchain_;
+            backgroundLayer.subImage.imageRect.offset = {0, 0};
+            backgroundLayer.subImage.imageRect.extent = {kBackgroundTextureWidth, kBackgroundTextureHeight};
+            backgroundLayer.subImage.imageArrayIndex = 0;
+            backgroundLayer.pose = MakeGroundPose();
+            backgroundLayer.size = {kGroundQuadWidthMeters, kGroundQuadDepthMeters};
+
+            layers[layerCount++] = reinterpret_cast<XrCompositionLayerBaseHeader*>(&backgroundLayer);
+        }
+
         {
             uint32_t imageIndex = 0;
             XrSwapchainImageAcquireInfo acquireInfo{XR_TYPE_SWAPCHAIN_IMAGE_ACQUIRE_INFO};
@@ -480,6 +513,11 @@ void FlutterXrApp::Shutdown() {
         quadSwapchain_ = XR_NULL_HANDLE;
     }
 
+    if (backgroundSwapchain_ != XR_NULL_HANDLE) {
+        xrDestroySwapchain(backgroundSwapchain_);
+        backgroundSwapchain_ = XR_NULL_HANDLE;
+    }
+
     if (pointerRaySwapchain_ != XR_NULL_HANDLE) {
         xrDestroySwapchain(pointerRaySwapchain_);
         pointerRaySwapchain_ = XR_NULL_HANDLE;
@@ -527,10 +565,13 @@ void FlutterXrApp::Shutdown() {
     deviceContext_.Reset();
     device_.Reset();
     flutterTexture_.Reset();
+    backgroundTexture_.Reset();
     pointerRayTexture_.Reset();
     quadImages_.clear();
+    backgroundImages_.clear();
     pointerRayImages_.clear();
     convertedPixels_.clear();
+    backgroundCustomPixels_.clear();
 }
 
 }  // namespace flutter_xr

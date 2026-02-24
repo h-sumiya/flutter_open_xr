@@ -23,6 +23,12 @@ inline constexpr float kQuadWidthMeters = 1.2f;
 inline constexpr float kQuadHeightMeters =
     kQuadWidthMeters * (static_cast<float>(kFlutterSurfaceHeight) / static_cast<float>(kFlutterSurfaceWidth));
 inline constexpr float kQuadDistanceMeters = 1.2f;
+inline constexpr int32_t kBackgroundTextureWidth = 1024;
+inline constexpr int32_t kBackgroundTextureHeight = 1024;
+inline constexpr float kGroundQuadWidthMeters = 8.0f;
+inline constexpr float kGroundQuadDepthMeters = 8.0f;
+inline constexpr float kGroundHeightMeters = -1.4f;
+inline constexpr float kGroundForwardMeters = -2.2f;
 inline constexpr int32_t kPointerRayTextureWidth = 256;
 inline constexpr int32_t kPointerRayTextureHeight = 8;
 inline constexpr float kPointerRayThicknessMeters = 0.01f;
@@ -60,6 +66,7 @@ class ScopedComInitializer {
 
 std::filesystem::path GetExecutableDir();
 std::string WideToUtf8(const std::wstring& wide);
+std::wstring Utf8ToWide(const std::string& utf8);
 
 XrVector3f Add(const XrVector3f& lhs, const XrVector3f& rhs);
 XrVector3f Subtract(const XrVector3f& lhs, const XrVector3f& rhs);
@@ -87,5 +94,6 @@ bool ConvertRgbaToBgra(const uint8_t* source,
                        std::vector<uint8_t>& outPixels);
 
 XrPosef MakeQuadPose();
+XrPosef MakeGroundPose();
 
 }  // namespace flutter_xr
