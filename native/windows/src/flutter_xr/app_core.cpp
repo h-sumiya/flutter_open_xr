@@ -599,6 +599,11 @@ void FlutterXrApp::Shutdown() {
         triggerValueAction_ = XR_NULL_HANDLE;
     }
 
+    if (scrollVectorAction_ != XR_NULL_HANDLE) {
+        xrDestroyAction(scrollVectorAction_);
+        scrollVectorAction_ = XR_NULL_HANDLE;
+    }
+
     if (pointerPoseAction_ != XR_NULL_HANDLE) {
         xrDestroyAction(pointerPoseAction_);
         pointerPoseAction_ = XR_NULL_HANDLE;

@@ -66,6 +66,7 @@ class FlutterXrApp {
     void InitializeInputActions();
     PointerHitResult QueryPointerHit(XrTime predictedDisplayTime, XrSpace pointerSpace, XrPath handPath);
     bool SendFlutterPointerEvent(FlutterPointerPhase phase, double xPixels, double yPixels, int64_t buttons);
+    bool SendFlutterScrollEvent(double xPixels, double yPixels, double deltaXPixels, double deltaYPixels);
     void EnsureFlutterPointerAdded(double xPixels, double yPixels);
     void PollInput(XrTime predictedDisplayTime);
 
@@ -99,6 +100,7 @@ class FlutterXrApp {
     XrActionSet inputActionSet_{XR_NULL_HANDLE};
     XrAction pointerPoseAction_{XR_NULL_HANDLE};
     XrAction triggerValueAction_{XR_NULL_HANDLE};
+    XrAction scrollVectorAction_{XR_NULL_HANDLE};
     XrPath rightHandPath_{XR_NULL_PATH};
     XrPath leftHandPath_{XR_NULL_PATH};
 

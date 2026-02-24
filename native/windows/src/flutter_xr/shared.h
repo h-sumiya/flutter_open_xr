@@ -39,6 +39,9 @@ inline constexpr float kPointerRayMinLengthMeters = 0.05f;
 inline constexpr DWORD kFirstFrameTimeoutMs = 15000;
 inline constexpr float kTriggerPressThreshold = 0.75f;
 inline constexpr float kTriggerReleaseThreshold = 0.65f;
+inline constexpr float kScrollAxisDeadzone = 0.2f;
+inline constexpr double kScrollPixelsPerFrame = 18.0;
+inline constexpr double kScrollDeltaEpsilonPixels = 0.01;
 inline constexpr int32_t kPointerDeviceId = 1;
 inline constexpr int64_t kFlutterViewId = 0;
 
